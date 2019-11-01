@@ -4,39 +4,39 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 class ActorCriticModel(tf.keras.models.Model):
-    '''
-    Actor Critic Model
-    - Contains both our actor and critic model seperately
-    as Keras Models
-    Arguments:
-    num_actions: Number of logits the actor model will output
-    state_size: List containing the expected size of the state
-    max_floor: Maximium number of floors reachable
-    stack_size: Numer of states we can expect in our stack
-    actor_fc: Iterable containing the amount of neurons per layer for the actor model
-    critic_fc: Iterable containing the amount of neurons per layer for the critic model
-        ex: (1024, 512, 256) would make 3 fully connected layers, with 1024, 512 and 256
-            layers respectively
-    conv_size: Iterable containing the kernel size, stride and number of filters for each
-               convolutional layer.
-        ex: ((8, 4, 16)) would make 1 convolution layer with an 8x8 kernel, (4, 4) stride
-            and 16 filters
-    '''
+    """General actor-critic model."""
+    
+    
     def __init__(self,
                  num_actions=None,
                  state_size=None,
-                 max_floor=25,
                  stack_size=None,
                  actor_fc=None,
                  critic_fc=None,
-                 conv_size=None,
-                 retro=True,
-                 build=True):
+                 conv_size=None):
+        """
+        Constructor.
+
+        Parameters:
+            num_actions: Number of logits the actor model will output
+            state_size: List containing the expected size of the state
+            stack_size: Numer of states we can expect in our stack
+            actor_fc: Iterable containing the amount of neurons per layer for
+            the actor model
+            critic_fc: Iterable containing the amount of neurons per layer for
+            the critic model
+                ex: (1024, 512, 256) would make 3 fully connected layers, with
+                1024, 512 and 256 neurons respectively
+            conv_size: Iterable containing the kernel size, stride and number
+            of filters for each
+                       convolutional layer.
+                ex: ((8, 4, 16)) would make 1 convolution layer with an 8x8
+                kernel,(4, 4) stride and 16 filters
+        """
         super().__init__()
         self.num_actions = num_actions
-        self.retro = retro
 
-        # Multiply the final dimension of the state by stack_size to get correct input_size
+        # Get true input_size
         self.state_size = state_size[:-1] + [state_size[-1] * stack_size]
 
         # Build convolutional layers
@@ -47,8 +47,8 @@ class ActorCriticModel(tf.keras.models.Model):
                 self.convs = Quake_Block()
             else:
                 raise ValueError("Invalid CNN Topology")
+            self.flatten = layers.Flatten()
         else: self.convs = None
-        self.flatten = layers.Flatten()
         
         # Build the fully connected layers for the actor and critic models
         self.actor_fc = [layers.Dense(neurons, activation="relu", name="actor_dense_{}".format(i)) for i,(neurons) in enumerate(actor_fc)]
@@ -58,41 +58,22 @@ class ActorCriticModel(tf.keras.models.Model):
         self.actor_logits = layers.Dense(num_actions, name='policy_logits')
         self.value = layers.Dense(1, name='value')
 
-        # Build the final total model
-        if build:
-            if retro:
-                self.step([[np.random.random((tuple(self.state_size))).astype(np.float32),
-                            np.random.random((max_floor + 1,)).astype(np.float32)]])
-            else:
-                self.step([[np.random.random((tuple(self.state_size))).astype(np.float32),
-                            np.random.random((max_floor + 1,)).astype(np.float32),
-                            np.random.random((2,)).astype(np.float32)]])
-
     def call(self, inputs):
-        if self.retro:
-            conv_input, critic_input = inputs
-        else:
-            conv_input, critic_input, shared_input = inputs
-
-        # Run convs on conv input
+        # Run convs on input
         if self.convs is not None:
-            conv_out = self.convs(conv_input)
-            shared_dense = self.flatten(conv_out)
+            conv_out = self.convs(inputs)
+            dense_in = self.flatten(conv_out)
         else:
-            shared_dense = conv_input
-
-        # Add shared information
-        if self.retro is False:
-            shared_dense = layers.concatenate([shared_dense, shared_input])
+            dense_in = inputs
 
         # Run actor layers
-        actor_dense = shared_dense
+        actor_dense = dense_in
         for l in self.actor_fc:
             actor_dense = l(actor_dense)
         actor_logits = self.actor_logits(actor_dense)
 
         # Run critic layers
-        critic_dense = layers.concatenate([shared_dense, critic_input])
+        critic_dense = dense_in
         for l in self.critic_fc:
             critic_dense = l(critic_dense)
         value = self.value(critic_dense)
@@ -113,7 +94,6 @@ class ActorCriticModel(tf.keras.models.Model):
         one_hot_actions = tf.one_hot(actions, self.num_actions)
         action_probs = tf.reduce_sum(probs * one_hot_actions, axis=-1).numpy()
 
-        # TODO Fix bug where this line breaks the program when there is only 1 env
         values = np.squeeze(values)
 
         return actions, values, action_probs
@@ -149,12 +129,12 @@ class Custom_Convs(tf.keras.Model):
             x = conv(x)
         return x
 
+# Quake 3 Deepmind style convolutions
+# Like dopamine but with an additional 3x3 kernel, and skip connections
 class Quake_Block(tf.keras.Model):
     def __init__(self):
         super().__init__(name='')
 
-        # Quake 3 Deepmind style convolutions
-        # Like dopamine but with an additional 3x3 kernel, and skip connections
         self.conv2A = layers.Conv2D(padding="same", kernel_size=8, strides=4, filters=32, activation="relu")
         self.conv2B = layers.Conv2D(padding="same", kernel_size=4, strides=2, filters=64, activation="relu")
         self.conv2C = layers.Conv2D(padding="same", kernel_size=3, strides=1, filters=64)
