@@ -45,8 +45,7 @@ class ActorCriticModel(tf.keras.models.Model):
                 self.convs = Custom_Convs(conv_size)
             elif conv_size == "quake":
                 self.convs = Quake_Block()
-            else:
-                raise ValueError("Invalid CNN Topology")
+            else: raise ValueError("Invalid CNN Topology")
             self.flatten = layers.Flatten()
         else: self.convs = None
         
@@ -56,7 +55,7 @@ class ActorCriticModel(tf.keras.models.Model):
 
         # Build the output layers for the actor and critic models
         self.actor_logits = layers.Dense(num_actions, name='policy_logits')
-        self.value = layers.Dense(1, name='value')
+        self.critic_out = layers.Dense(1, name='value')
 
     def call(self, inputs):
         # Run convs on input
@@ -79,32 +78,6 @@ class ActorCriticModel(tf.keras.models.Model):
         value = self.value(critic_dense)
 
         return actor_logits, value
-
-    def step(self, inputs):
-        inputs = self.process_inputs(inputs)
-
-        # Make predictions on input
-        logits, values = self.predict(inputs)
-        probs = tf.nn.softmax(logits)
-
-        # Sample from probability distributions
-        actions = tf.squeeze(tf.random.categorical(logits, 1), axis=-1).numpy()
-
-        # Get action probabilities
-        one_hot_actions = tf.one_hot(actions, self.num_actions)
-        action_probs = tf.reduce_sum(probs * one_hot_actions, axis=-1).numpy()
-
-        values = np.squeeze(values)
-
-        return actions, values, action_probs
-
-    def get_values(self, inputs):
-        inputs = self.process_inputs(inputs)
-
-        _, values = self.predict(inputs)
-        values = np.squeeze(values)
-
-        return values
 
     def process_inputs(self, inputs):
         # Convert n_envs x n_inputs list to n_inputs x n_envs list if we have
