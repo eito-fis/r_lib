@@ -4,13 +4,27 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 class ActorCriticModel(tf.keras.models.Model):
-    """General actor-critic model."""
+    """
+    General actor-critic model.
+     
+    Attributes:
+        state_size: State size the model will accept
+        convs: Convolutional layers of the model
+        flatten: Flatten operation of the model
+        actor_fc: List containing the actor's fully connected layers
+        actor_out: Output layer of the actor
+        critics_fc: List of lists, where each inner list is a critic's fully
+        connected layers
+        critic_out: List of critic's output layers
+    """
     
     
     def __init__(self,
-                 num_actions=None,
                  state_size=None,
                  stack_size=None,
+                 actor_out=None,
+                 num_critic=1,
+                 critic_out=1,
                  actor_fc=None,
                  critic_fc=None,
                  conv_size=None):
@@ -18,9 +32,11 @@ class ActorCriticModel(tf.keras.models.Model):
         Constructor.
 
         Parameters:
-            num_actions: Number of logits the actor model will output
             state_size: List containing the expected size of the state
             stack_size: Numer of states we can expect in our stack
+            actor_out: Number of logits actor will output
+            num_critic: Number of critic models that will be made
+            critic_out: Number of logits each critic will output
             actor_fc: Iterable containing the amount of neurons per layer for
             the actor model
             critic_fc: Iterable containing the amount of neurons per layer for
@@ -49,13 +65,20 @@ class ActorCriticModel(tf.keras.models.Model):
             self.flatten = layers.Flatten()
         else: self.convs = None
         
-        # Build the fully connected layers for the actor and critic models
-        self.actor_fc = [layers.Dense(neurons, activation="relu", name="actor_dense_{}".format(i)) for i,(neurons) in enumerate(actor_fc)]
-        self.critic_fc = [layers.Dense(neurons, activation="relu", name="critic_dense_{}".format(i)) for i,(neurons) in enumerate(critic_fc)]
+        # Build the layers for the actor and critic models
+        self.actor_fc = [layers.Dense(neurons, activation="relu",
+                                      name=f"actor_dense_{i}")
+                         for i,(neurons) in enumerate(actor_fc)]
+        self.actor_out = layers.Dense(actor_out, name='actor_logits')
 
-        # Build the output layers for the actor and critic models
-        self.actor_logits = layers.Dense(num_actions, name='policy_logits')
-        self.critic_out = layers.Dense(1, name='value')
+        self.critics_fc = []
+        self.critics_out = []
+        for c in range(num_critics):
+            self.critics.append([layers.Dense(neurons, activation="relu",
+                                              name=f"critic_{c}_dense_{i}")
+                                 for i,(neurons) in enumerate(critic_fc)])
+            self.critics_out.append(layers.Dense(critic_out,
+                                                 name=f'critic_{c}_out'))
 
     def call(self, inputs):
         # Run convs on input
@@ -69,15 +92,21 @@ class ActorCriticModel(tf.keras.models.Model):
         actor_dense = dense_in
         for l in self.actor_fc:
             actor_dense = l(actor_dense)
-        actor_logits = self.actor_logits(actor_dense)
+        actor_out = self.actor_out(actor_dense)
 
-        # Run critic layers
-        critic_dense = dense_in
-        for l in self.critic_fc:
-            critic_dense = l(critic_dense)
-        value = self.value(critic_dense)
+        # Run all critic layers
+        critic_out = []
+        for c_fc, c_out in zip(self.critics_fc, self.critics_out):
+            critic_dense = dense_in
+            for l in c_fc:
+                critic_dense = l(critic_dense)
+            critic_out.append(c_out(critic_dense))
 
-        return actor_logits, value
+        # Return critic_out as a list only if there are multiple critics
+        if len(critic_out) == 1:
+            return actor_out, critic_out[0]
+        else:
+            return actor_out, critic_out
 
     def process_inputs(self, inputs):
         # Convert n_envs x n_inputs list to n_inputs x n_envs list if we have
