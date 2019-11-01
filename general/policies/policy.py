@@ -1,6 +1,3 @@
-import numpy as np
-import tensorflow as tf
-
 class Policy():
     """
     General policy framework
