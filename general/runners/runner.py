@@ -33,10 +33,11 @@ class Runner():
             - infos
         """
 
-        b_obs, b_rewards, b_dones, b_actions, b_values, b_probs, ep_infos = self.rollout()
+        b_obs, b_rewards, b_dones, b_actions, b_values, b_probs, ep_infos = \
+                self.rollout()
         b_dones.append(self.dones)
 
-        # Convert to numpy array and change shape from (num_steps, n_envs) to (n_envs, num_steps)
+        # Change shape from (num_steps, n_envs) to (n_envs, num_steps)
         b_obs = np.asarray(b_obs, dtype=self.obs.dtype).swapaxes(0, 1)
         b_rewards = np.asarray(b_rewards, dtype=np.float32).swapaxes(0, 1)
         b_actions = np.asarray(b_actions).swapaxes(0, 1)
@@ -48,24 +49,28 @@ class Runner():
         last_values = self.model.get_values(self.obs).tolist()
 
         # Calculate future discounted reward
-        for n, (rewards, dones, value) in enumerate(zip(b_rewards, b_dones, last_values)):
+        for n, (rewards, dones, value) in enumerate(zip(b_rewards, b_dones,
+                                                        last_values)):
             rewards = rewards.tolist()
             dones = dones.tolist()
             if dones[-1] == 0:
-                rewards = self.discount(rewards + [value], dones + [0], self.gamma)[:-1]
+                rewards = self.discount(rewards + [value], dones + [0],
+                                        self.gamma)[:-1]
             else:
                 rewards = self.discount(rewards, dones, self.gamma)
             b_rewards[n] = rewards
 
-        # Flatten (num_env, num_steps) to (num_envs * num_steps) so we have one big batch
+        # Flatten (num_env, num_steps) to (num_envs * num_steps) to one batch
         b_obs, b_rewards, b_dones, b_actions, b_values, b_probs, true_rewards = \
             map(self.flatten, (b_obs, b_rewards, b_dones, b_actions,
                                b_values, b_probs, true_rewards))
-        return b_obs, b_rewards, b_dones, b_actions, b_values, b_probs, true_rewards, ep_infos
+        return b_obs, b_rewards, b_dones, b_actions, b_values, b_probs,
+    true_rewards, ep_infos
 
     def rollout(self):
         # Init lists
-        b_obs, b_rewards, b_actions, b_values, b_dones, b_probs = [], [], [], [], [], []
+        b_obs, b_rewards, b_actions, b_values, b_dones, b_probs = [], [], [],
+        [], [], []
         ep_infos = []
 
         # Rollout on each env for num_steps
@@ -94,7 +99,8 @@ class Runner():
 
     def discount(self, rewards, dones, gamma):
         """
-        Apply the discount value to the reward, where the environment is not done
+        Apply the discount value to the reward, where the environment is not
+        done
         """
         discounted = []
         ret = 0
