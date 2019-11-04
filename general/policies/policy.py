@@ -31,7 +31,6 @@ class RandomPolicy(Policy):
     Attributes:
         action_space: Action space of the policy, expected format depends on the
         action_space_type
-        representining minimium and maximium values of that action.
         action_space_type: What type of action space the policy is operating in.
         Current possible values are "Discrete" and "Continuous"
             - Discrete should pass an int as action_space
@@ -75,7 +74,7 @@ class RandomPolicy(Policy):
 
     def sample_continuous(self):
         """
-        Samples form a continuous uniform distribution
+        Samples from a continuous uniform distribution
 
         Returns:
             actions: List of length batch_size, where each element is a list
