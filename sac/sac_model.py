@@ -97,12 +97,12 @@ class SACModel(tf.keras.models.Model):
         actor_std = self.actor_std(actor_dense)
 
         # Run critic layers
-        q1_dense = tf.concat([dense_in, actions])
+        q1_dense = tf.concat([dense_in, actions], axis=-1)
         for l in self.q1_fc:
             q1_dense = l(q1_dense)
         q1_out = q1_out(q1_dense)
 
-        q2_dense = tf.concat([dense_in, actions])
+        q2_dense = tf.concat([dense_in, actions], axis=-1)
         for l in self.q2_fc:
             q2_dense = l(q2_dense)
         q2_out = q2_out(q2_dense)
@@ -135,12 +135,12 @@ class SACModel(tf.keras.models.Model):
             dense_in = obs
 
         # Run target critics
-        q1_t_dense = tf.concat([dense_in, actions])
+        q1_t_dense = tf.concat([dense_in, actions], axis=-1)
         for l in self.q1_t_fc:
             q1_t_dense = l(q1_t_dense)
         q1_t_out = q1_t_out(q1_t_dense)
 
-        q2_t_dense = tf.concat([dense_in, actions])
+        q2_t_dense = tf.concat([dense_in, actions], axis=-1)
         for l in self.q2_t_fc:
             q2_t_dense = l(q2_t_dense)
         q2_t_out = q2_t_out(q2_t_dense)
