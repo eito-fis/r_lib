@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
 
+from src.general.policies import Policy
+
 # Prevent division by zero
 EPS = 1e-6
 # CAP the standard deviation of the actor
