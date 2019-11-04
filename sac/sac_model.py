@@ -73,13 +73,13 @@ class SACModel(tf.keras.models.Model):
                       in enumerate(critic_fc)]
         self.q2_out = layers.Dense(1, name='q2_out')
 
-    def call(self, inputs):
+    def call(self, obs, actions):
         # Run convs on input
         if self.convs is not None:
-            conv_out = self.convs(inputs)
+            conv_out = self.convs(obs)
             dense_in = self.flatten(conv_out)
         else:
-            dense_in = inputs
+            dense_in = obs
 
         # Run actor layers
         actor_dense = dense_in
@@ -89,17 +89,35 @@ class SACModel(tf.keras.models.Model):
         actor_std = self.actor_std(actor_dense)
 
         # Run critic layers
-        q1_dense = dense_in
+        q1_dense = tf.concat([dense_in, actions])
         for l in self.q1_fc:
             q1_dense = l(q1_dense)
         q1_out = q1_out(q1_dense)
 
-        q2_dense = dense_in
+        q2_dense = tf.concat([dense_in, actions])
         for l in self.q2_fc:
             q2_dense = l(q2_dense)
         q2_out = q2_out(q2_dense)
 
         return actor_mean, actor_std, q1_out, q2_out
+
+    def step(self, obs):
+        # Run convs on input
+        if self.convs is not None:
+            conv_out = self.convs(obs)
+            dense_in = self.flatten(conv_out)
+        else:
+            dense_in = obs
+
+        # Run actor layers
+        actor_dense = dense_in
+        for l in self.actor_fc:
+            actor_dense = l(actor_dense)
+        actor_mean = self.actor_mean(actor_dense)
+        actor_std = self.actor_std(actor_dense)
+
+        return actor_mean, actor_std
+        
 
     def process_inputs(self, inputs):
         # Convert n_envs x n_inputs list to n_inputs x n_envs list if we have
