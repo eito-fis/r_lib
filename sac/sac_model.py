@@ -3,6 +3,94 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
+class SACQNet(tf.keras.model.Model):
+    def __init__(self,
+                 state_size=None,
+                 stack_size=None,
+                 action_space=None,
+                 fc=None,
+                 conv_size=None):
+        super().__init__()
+
+        # Get true input_size
+        self.state_size = state_size[:-1] + [state_size[-1] * stack_size]
+
+        # Build convolutional layers
+        if conv_size is not None:
+            if isinstance(conv_size, tuple):
+                self.convs = Custom_Convs(conv_size)
+            elif conv_size == "quake":
+                self.convs = Quake_Block()
+            else: raise ValueError("Invalid CNN Topology")
+            self.flatten = layers.Flatten()
+        else: self.convs = None
+
+        self.fc = [layers.Dense(neurons, activation="activation",
+                                   name=f"q_dense_{i}") for i,(neurons)
+                      in enumerate(fc)]
+        self.out = layers.Dense(1, name=f"q_out")
+
+    def call(self, obs, actions):
+        # Run convs on input
+        if self.convs is not None:
+            conv_out = self.convs(obs)
+            dense_in = self.flatten(conv_out)
+        else:
+            dense_in = obs
+
+        dense = tf.concat([dense_in, actions], axis=-1)
+        for l in self.fc:
+            dense = l(dense)
+        out = self.out(dense)
+
+        return out
+
+class SACActor(tf.keras.models.Model):
+    def __init__(self,
+                 state_size=None,
+                 stack_size=None,
+                 action_space=None,
+                 fc=None,
+                 conv_size=None):
+        super().__init__()
+
+        # Get true input_size
+        self.state_size = state_size[:-1] + [state_size[-1] * stack_size]
+
+        # Build convolutional layers
+        if conv_size is not None:
+            if isinstance(conv_size, tuple):
+                self.convs = Custom_Convs(conv_size)
+            elif conv_size == "quake":
+                self.convs = Quake_Block()
+            else: raise ValueError("Invalid CNN Topology")
+            self.flatten = layers.Flatten()
+        else: self.convs = None
+
+        # Build the layers for the actor and critic models
+        self.fc = [layers.Dense(neurons, activation="relu",
+                                      name=f"actor_dense_{i}")
+                         for i,(neurons) in enumerate(fc)]
+        self.mean = layers.Dense(len(action_space), name='actor_mean')
+        self.std = layers.Dense(len(action_space), name='actor_std')
+
+    def step(self, obs):
+        # Run convs on input
+        if self.convs is not None:
+            conv_out = self.convs(obs)
+            dense_in = self.flatten(conv_out)
+        else:
+            dense_in = obs
+
+        # Run actor layers
+        dense = dense_in
+        for l in self.fc:
+            dense = l(dense)
+        mean = self.mean(dense)
+        std = self.std(dense)
+
+        return mean, std
+
 class SACModel(tf.keras.models.Model):
     """
     Soft Actor Critic model.
