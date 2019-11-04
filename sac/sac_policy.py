@@ -55,7 +55,7 @@ class SACPolicy(Policy):
             actions: List of length of obs, where each element is a list
             containing actions for all dimensions
         """
-        mean, log_std = self.model.call(obs)
+        mean, log_std, q1, q2 = self.model.call(obs)
         log_std = tf.clip_by_value(log_std, LOG_STD_MIN, LOG_STD_MAX)
         std = tf.exp(log_std)
 
@@ -65,7 +65,7 @@ class SACPolicy(Policy):
         scaled_action, scaled_log_prob = self.squish(mean, action, log_prob)
 
         scaled_action = scaled_action * self.ranges + self.mins
-        return scaled_action, scaled_log_prob
+        return scaled_action, scaled_log_prob, q1, q2
 
     def gaussian_prob(self, mean, log_std, action):
         """
@@ -85,5 +85,5 @@ class SACPolicy(Policy):
         log_prob -= tf.reduce_sum(tf.log(1 - scaled_action ** 2 + EPS), axis=1)
         return scaled_action, log_prob
 
-    def step(self):
-        return self.sample_func()
+    def step(self, obs):
+        return self.sample_func(obs)
