@@ -136,36 +136,7 @@ class SACAgent():
                        i < self.random_steps:
                         break
 
-                    # Sample and unpack batch
-                    batch = self.replay_buffer.sample(self.batch_size)
-                    b_obs, b_actions, b_rewards, b_n_obs, b_dones = batch
-                    b_obs = process_inputs(b_obs)
-
-                    # Calculate loss
-                    b_n_actions, n_log_probs = self.policy(b_n_obs)
-                    q1_ts = self.q1_t(b_n_obs, b_n_actions)
-                    q2_ts = self.q2_t(b_n_obs, b_n_actions)
-                    
-                    min_q_ts = tf.minimum(q1_ts, q2_ts) - self.alpha * \
-                            n_log_probs
-                    target_q = tf.stop_gradient(b_rewards + (1 - b_dones) *
-                                                self.gamma * min_q_ts)
-                    with tf.GradientTape(persistent=True) as tape:
-                        # Q loss
-                        q1s = self.q1(b_obs, b_actions)
-                        q2s = self.q2(b_obs, b_actions)
-                        q1_loss = 0.5 * tf.reduce_mean((q1s - target_q) ** 2)
-                        q2_loss = 0.5 * tf.reduce_mean((q2s - target_q) ** 2)
-
-                        # Policy loss
-                        new_actions, log_probs = self.policy(b_obs)
-                        n_q1s = self.q1(b_obs, new_actions)
-                        n_q2s = self.q2(b_obs, new_actions)
-                        min_n_qs = tf.min(q1s, q2s)
-
-                        policy_loss = tf.reduce_mean(self.alpha * log_probs - \
-                                                     min_n_qs)
-
+                    q1_loss, q2_loss, policy_loss, tape = self.loss()
                     # Calculate and apply gradients
                     q1_grad = tape.gradient(q1_loss, self.q1.trainable_weights)
                     self.q1_opt.apply_gradients(zip(q1_grad,
@@ -177,14 +148,40 @@ class SACAgent():
                                                self.actor.trainable_weights)
                     self.actor_opt.apply_gradients(zip(actor_grad,
                                                        self.actor.trainable_weights))
-                    # Delete the Gradient Tape
+                    # Delete the GradientTape
                     del tape
-
-            # Log data
-            self.logging(b_rewards, b_values, ep_infos, entropy_loss,
-                         policy_loss, value_loss, i)
-
             print("\n")
+
+    def loss(self):
+        # Sample and unpack batch
+        batch = self.replay_buffer.sample(self.batch_size)
+        b_obs, b_actions, b_rewards, b_n_obs, b_dones = batch
+        b_obs = process_inputs(b_obs)
+
+        # Calculate loss
+        b_n_actions, n_log_probs = self.policy(b_n_obs)
+        q1_ts = self.q1_t(b_n_obs, b_n_actions)
+        q2_ts = self.q2_t(b_n_obs, b_n_actions)
+        
+        # TODO Make sure you don't need to stop gradient here
+        min_q_ts = tf.minimum(q1_ts, q2_ts) - self.alpha * n_log_probs
+        target_q = b_rewards + (1 - b_dones) * self.gamma * min_q_ts
+        with tf.GradientTape(persistent=True) as tape:
+            # Q loss
+            q1s = self.q1(b_obs, b_actions)
+            q2s = self.q2(b_obs, b_actions)
+            q1_loss = 0.5 * tf.reduce_mean((q1s - target_q) ** 2)
+            q2_loss = 0.5 * tf.reduce_mean((q2s - target_q) ** 2)
+
+            # Policy loss
+            new_actions, log_probs = self.policy(b_obs)
+            n_q1s = self.q1(b_obs, new_actions)
+            n_q2s = self.q2(b_obs, new_actions)
+            min_n_qs = tf.min(q1s, q2s)
+
+            policy_loss = tf.reduce_mean(self.alpha * log_probs - min_n_qs)
+        return q1_loss, q2_loss, policy_loss, tape
+
 
     def logging(self, rewards, values, ep_infos, entropy_loss, policy_loss,
                 value_loss, i):
