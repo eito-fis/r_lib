@@ -64,14 +64,22 @@ class SACModel(tf.keras.models.Model):
         self.actor_mean = layers.Dense(len(action_space), name='actor_mean')
         self.actor_std = layers.Dense(len(action_space), name='actor_std')
 
-        self.q1_fc = [layers.Dense(neurons, activation="relu",
-                                   name=f"q1_dense_{i}") for i,(neurons)
+        # Make Q networks
+        self.q1_fc, self.q1_out = self.make_q(critic_fc, "relu", "q1")
+        self.q2_fc, self.q2_out = self.make_q(critic_fc, "relu", "q2")
+        # Make Q target networks 
+        self.q1_t_fc, self.q1_t_out = self.make_q(critic_fc, "relu", "q1_t")
+        self.q2_t_fc, self.q2_t_out = self.make_q(critic_fc, "relu", "q2_t")
+
+    def make_q(self, critic_fc, activation, name):
+        """
+        Helper function to make Q networks
+        """
+        q_fc = [layers.Dense(neurons, activation="activation",
+                                   name=f"{name}_dense_{i}") for i,(neurons)
                       in enumerate(critic_fc)]
-        self.q1_out = layers.Dense(1, name='q1_out')
-        self.q2_fc = [layers.Dense(neurons, activation="relu",
-                                   name=f"q2_dense_{i}") for i,(neurons)
-                      in enumerate(critic_fc)]
-        self.q2_out = layers.Dense(1, name='q2_out')
+        q_out = layers.Dense(1, name=f"{name}_out")
+        return q_fc, q_out
 
     def call(self, obs, actions):
         # Run convs on input
@@ -117,7 +125,27 @@ class SACModel(tf.keras.models.Model):
         actor_std = self.actor_std(actor_dense)
 
         return actor_mean, actor_std
-        
+
+    def targets(self, obs, actions):
+        # Run convs on input
+        if self.convs is not None:
+            conv_out = self.convs(obs)
+            dense_in = self.flatten(conv_out)
+        else:
+            dense_in = obs
+
+        # Run target critics
+        q1_t_dense = tf.concat([dense_in, actions])
+        for l in self.q1_t_fc:
+            q1_t_dense = l(q1_t_dense)
+        q1_t_out = q1_t_out(q1_t_dense)
+
+        q2_t_dense = tf.concat([dense_in, actions])
+        for l in self.q2_t_fc:
+            q2_t_dense = l(q2_t_dense)
+        q2_t_out = q2_t_out(q2_t_dense)
+
+        return  q1_t_out, q2_t_out
 
     def process_inputs(self, inputs):
         # Convert n_envs x n_inputs list to n_inputs x n_envs list if we have
