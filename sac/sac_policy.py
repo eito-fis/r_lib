@@ -57,7 +57,7 @@ class SACPolicy(Policy):
             actions: List of length of obs, where each element is a list
             containing actions for all dimensions
         """
-        mean, log_std = self.model.step(obs)
+        mean, log_std = self.model(obs)
         log_std = tf.clip_by_value(log_std, LOG_STD_MIN, LOG_STD_MAX)
         std = tf.exp(log_std)
 
