@@ -87,5 +87,5 @@ class SACPolicy(Policy):
         log_prob -= tf.reduce_sum(tf.log(1 - scaled_action ** 2 + EPS), axis=1)
         return scaled_action, log_prob
 
-    def step(self, obs):
+    def call(self, obs):
         return self.sample_func(obs)
