@@ -29,11 +29,13 @@ class SACAgent():
                  train_steps=None,
                  random_steps=None,
                  train_freq=1,
+                 target_update_freq=1,
                  actor_lr=0.0042,
                  q_lr=0.0042,
                  entropy_lr=0.0042,
                  gamma=0.99,
                  alpha=None,
+                 tau=0.05,
                  buffer_size=50000,
                  batch_size=64,
                  gradient_steps=1,
@@ -91,9 +93,11 @@ class SACAgent():
         # Setup training parameters
         self.gamma = gamma
         self.alpha = alpha
+        self.tau = tau
         self.train_steps = train_steps
         self.random_steps = random_steps
         self.train_freq = train_freq
+        self.target_update_feq = target_update_freq
         self.batch_size = batch_size
         self.gradient_steps = gradient_steps
 
@@ -122,7 +126,6 @@ class SACAgent():
 
             # Take step on env with action
             new_obs, rewards, self.dones, self.infos = self.env.step(actions)
-
             # Store SARS(D) in replay buffer
             self.replay_buffer.add(self.obs, action, rewards, new_obs,
                                    float(self.done))
@@ -137,6 +140,7 @@ class SACAgent():
                         break
 
                     q1_loss, q2_loss, policy_loss, tape = self.loss()
+
                     # Calculate and apply gradients
                     q1_grad = tape.gradient(q1_loss, self.q1.trainable_weights)
                     self.q1_opt.apply_gradients(zip(q1_grad,
@@ -150,7 +154,12 @@ class SACAgent():
                                                        self.actor.trainable_weights))
                     # Delete the GradientTape
                     del tape
-            print("\n")
+
+                    # Soft updates for the target network
+                    # TODO: Test this
+                    if (i +  g) % self.target_update_freq == 0:
+                        self.soft_update(self.q1_t, self.q1)
+                        self.soft_update(self.q2_t, self.q2)
 
     def loss(self):
         # Sample and unpack batch
@@ -182,6 +191,14 @@ class SACAgent():
             policy_loss = tf.reduce_mean(self.alpha * log_probs - min_n_qs)
         return q1_loss, q2_loss, policy_loss, tape
 
+    def soft_update(self, q_t, q):
+        """
+        Soft update from q to target_q network based on self.tau
+        """
+        for target_param, param in zip(q_t.trainable_weights,
+                                       q.trainable_weights):
+            updated_param = (1 - self.tau) * target_param + self.tau * param
+            tf.assign(target_param, updated_param)
 
     def logging(self, rewards, values, ep_infos, entropy_loss, policy_loss,
                 value_loss, i):
