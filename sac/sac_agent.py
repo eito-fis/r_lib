@@ -112,6 +112,9 @@ class SACAgent():
         self.summary_writer = tf.summary.create_file_writer(self.log_dir)
 
     def train(self):
+        """
+        Trains the model
+        """
         for i in range(self.train_steps):
             if i < self.random_steps:
                 actions = self.random_policy()
@@ -139,6 +142,9 @@ class SACAgent():
                     self.update(i, g)
 
     def update(self, i, g, ep_infos):
+        """
+        Samples from the replay buffer and updates the model
+        """
         # Sample and unpack batch
         batch = self.replay_buffer.sample(self.batch_size)
         b_obs, b_actions, b_rewards, b_n_obs, b_dones = batch
@@ -239,12 +245,13 @@ class SACAgent():
                                 "Q2 Loss": q2_loss,
                                 "Alpha": self.alpha})
 
-        # Periodically save checkoints
+        # Periodically save all models
         if i % self.checkpoint_period == 0:
-            model_save_path = os.path.join(self.checkpoint_dir,
-                                           "model_{}.h5".format(i))
-            self.model.save_weights(model_save_path)
-            print("Model saved to {}".format(model_save_path))
+            self.actor_model.save(f"actor_model_{i}", self.checkpoint_dir)
+            self.q1_model.save(f"q1_model_{i}", self.checkpoint_dir)
+            self.q2_model.save(f"q2_model_{i}", self.checkpoint_dir)
+            self.q1_t_model.save(f"q1_t_model_{i}", self.checkpoint_dir)
+            self.q2_t_model.save(f"q2_t_model_{i}", self.checkpoint_dir)
 
 
 
