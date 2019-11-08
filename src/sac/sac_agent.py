@@ -40,7 +40,7 @@ class SACAgent():
 
         # Build environment
         self.env = env
-        self.obs, self.infos = self.env.reset()
+        self.obs = self.env.reset()
         self.action_space = self.env.action_space
 
         # Build networks

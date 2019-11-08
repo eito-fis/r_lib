@@ -22,3 +22,6 @@ class GymEnv():
 
     def close(self):
         self.env.close()
+
+    def reset(self):
+        obs = self.env.reset()
