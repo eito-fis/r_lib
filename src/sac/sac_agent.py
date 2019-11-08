@@ -11,7 +11,6 @@ from src.sac.sac_policy import SACPolicy
 from src.general.policies import RandomPolicy
 from src.general.replay_buffers.replay_buffer import ReplayBuffer
 
-
 class SACAgent():
     """
     SAC Agent class. Builds and trains a model

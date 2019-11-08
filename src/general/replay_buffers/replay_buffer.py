@@ -1,12 +1,11 @@
 class ReplayBuffer(object):
     """"
-    StableBaselines ReplayBuffer object.
-    """
+    StableBaselines ReplayBuffer object.  """
     def __init__(self, size):
         """
         Implements a ring buffer (FIFO).
-        :param size: (int)  Max number of transitions to store in the buffer. When the buffer overflows the old
-        memories are dropped.
+        :param size: (int)  Max number of transitions to store in the buffer.
+        When the buffer overflows the old memories are dropped.
         """
         self._storage = []
         self._maxsize = size
@@ -17,7 +16,8 @@ class ReplayBuffer(object):
 
     @property
     def storage(self):
-        """[(np.ndarray, float, float, np.ndarray, bool)]: content of the replay buffer"""
+        """[(np.ndarray, float, float, np.ndarray, bool)]: content of the replay
+        buffer"""
         return self._storage
 
     @property
@@ -68,7 +68,8 @@ class ReplayBuffer(object):
             rewards.append(reward)
             obses_tp1.append(np.array(obs_tp1, copy=False))
             dones.append(done)
-            return np.array(obses_t), np.array(actions), np.array(rewards), np.array(obses_tp1), np.array(dones)
+        return np.array(obses_t), np.array(actions), np.array(rewards),
+    np.array(obses_tp1), np.array(dones)
 
     def sample(self, batch_size, **_kwargs):
         """
@@ -77,10 +78,13 @@ class ReplayBuffer(object):
         :return:
             - obs_batch: (np.ndarray) batch of observations
             - act_batch: (numpy float) batch of actions executed given obs_batch
-            - rew_batch: (numpy float) rewards received as results of executing act_batch
-            - next_obs_batch: (np.ndarray) next set of observations seen after executing act_batch
-            - done_mask: (numpy bool) done_mask[i] = 1 if executing act_batch[i] resulted in the end of an episode
-            and 0 otherwise.
+            - rew_batch: (numpy float) rewards received as results of executing
+            act_batch
+            - next_obs_batch: (np.ndarray) next set of observations seen after
+            executing act_batch
+            - done_mask: (numpy bool) done_mask[i] = 1 if executing act_batch[i]
+            resulted in the end of an episode and 0 otherwise.
             """
-        idxes = [random.randint(0, len(self._storage) - 1) for _ in range(batch_size)]
+        idxes = [random.randint(0, len(self._storage) - 1) for _ in
+                 range(batch_size)]
         return self._encode_sample(idxes)

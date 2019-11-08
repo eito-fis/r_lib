@@ -10,7 +10,7 @@ from src.a2c.models.actor_critic_model import ActorCriticModel
 from src.a2c.runners.runner import Runner
 
 class A2CAgent():
-    '''
+    """
     A2C Agent class. Trains the model
     train_steps: Number of episodes to play and train on
     entropy_discount: Amount to discount entropy loss by relative to policy loss
@@ -23,7 +23,7 @@ class A2CAgent():
     actor_fc: Actor model dense layers topology
     critic_fc: Critic model dense layers topology
     conv_size: Conv model topology
-    '''
+    """
     def __init__(self,
                  train_steps=None,
                  entropy_discount=0.01,
@@ -171,7 +171,7 @@ class A2CAgent():
 
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from src.a2c.wrapped_obstacle_tower_env import WrappedObstacleTowerEnv
     env_filename = "../ObstacleTower/obstacletower"
     def env_func(idx):
