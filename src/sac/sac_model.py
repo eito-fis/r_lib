@@ -127,7 +127,7 @@ class SACActor(Model):
         self.mean = layers.Dense(self.num_actions, name=f'{name}_mean')
         self.std = layers.Dense(self.num_actions, name=f'{name}_std')
 
-    def step(self, obs):
+    def call(self, obs):
         # Run convs on input
         if self.convs is not None:
             conv_out = self.convs(obs)
