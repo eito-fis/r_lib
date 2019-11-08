@@ -128,17 +128,17 @@ class SACAgent():
         """
         for i in range(self.train_steps):
             if i < self.random_steps:
-                actions = self.random_policy()
+                action = self.random_policy()
             else:
-                actions, _ = self.policy(self.obs)
-                actions = actions * np.abs(self.action_space.low)
-            assert actions.shape == self.action_space.shape
+                action, _ = self.policy(self.obs)
+                action = action * np.abs(self.action_space.low)
+            assert action.shape == self.action_space.shape
 
             # Take step on env with action
-            new_obs, rewards, self.dones, self.infos = self.env.step(actions)
+            new_obs, rewards, done, self.infos = self.env.step(action)
             # Store SARS(D) in replay buffer
             self.replay_buffer.add(self.obs, action, rewards, new_obs,
-                                   float(self.done))
+                                   float(done))
             self.obs = new_obs
 
             if done:
@@ -147,7 +147,7 @@ class SACAgent():
 
             # Periodically learn
             if i % self.train_freq == 0:
-                for g in self.gradient_steps:
+                for g in range(self.gradient_steps):
                     # Don"t train if the buffer is not full enough or if we are
                     # still collecting random samples
                     if not self.replay_buffer.can_sample(self.batch_size) or \
