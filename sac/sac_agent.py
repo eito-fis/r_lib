@@ -13,9 +13,9 @@ from src.general.replay_buffers.replay_buffer import ReplayBuffer
 
 
 class SACAgent():
-    '''
+    """
     SAC Agent class. Builds and trains a model
-    '''
+    """
     def __init__(self,
                  train_steps=None,
                  random_steps=None,
@@ -66,7 +66,11 @@ class SACAgent():
                           conv_size=conv_size)
         self.q1_t = tf.keras.models.clone_model(self.q1)
         self.q2_t = tf.keras.models.clone_model(self.q2)
-        self.models = (self.actor, self.q1, self.q2, self.q1_t, self.q2_t)
+        if restore_dir:
+            models = (self.actor, self.q1, self.q2, self.q1_t, self.q2_t)
+            for model, restore_file in zip(models, restore_dir):
+                model.load_weights(restore_file)
+            
 
         # Build policy, replay buffer and optimizers
         self.policy = SACPolicy(action_space=self.env.action_space,
@@ -134,7 +138,7 @@ class SACAgent():
             # Periodically learn
             if i % self.train_freq == 0:
                 for g in self.gradient_steps:
-                    # Don't train if the buffer is not full enough or if we are
+                    # Don"t train if the buffer is not full enough or if we are
                     # still collecting random samples
                     if not self.replay_buffer.can_sample(self.batch_size) or \
                        i < self.random_steps:
@@ -148,7 +152,7 @@ class SACAgent():
         # Sample and unpack batch
         batch = self.replay_buffer.sample(self.batch_size)
         b_obs, b_actions, b_rewards, b_n_obs, b_dones = batch
-        # Probably don't need to preprocess if not doing parallel actors
+        # Probably don"t need to preprocess if not doing parallel actors
         #b_obs = process_inputs(b_obs)
 
         # Calculate loss
@@ -156,7 +160,7 @@ class SACAgent():
         q1_ts = self.q1_t(b_n_obs, b_n_actions)
         q2_ts = self.q2_t(b_n_obs, b_n_actions)
         
-        # TODO Make sure you don't need to stop gradient here
+        # TODO Make sure you don"t need to stop gradient here
         min_q_ts = tf.minimum(q1_ts, q2_ts) - self.alpha * n_log_probs
         target_q = b_rewards + (1 - b_dones) * self.gamma * min_q_ts
         with tf.GradientTape(persistent=True) as tape:
@@ -255,7 +259,7 @@ class SACAgent():
 
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     from src.a2c.wrapped_obstacle_tower_env import WrappedObstacleTowerEnv
     env_filename = "../ObstacleTower/obstacletower"
     def env_func(idx):
