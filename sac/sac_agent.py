@@ -15,15 +15,6 @@ from src.general.replay_buffers.replay_buffer import ReplayBuffer
 class SACAgent():
     '''
     SAC Agent class. Builds and trains a model
-    train_steps: Number of episodes to play and train on
-    learning_rate: Learning_rate
-    num_steps: Number of steps for each environment to take per rollout
-    env_func: Function that builds one instance of an environment. Will be
-    passed an idx as arg
-    num_envs: Number of environments to run in parallel
-    actor_fc: Actor model dense layers topology
-    critic_fc: Critic model dense layers topology
-    conv_size: Conv model topology
     '''
     def __init__(self,
                  train_steps=None,
@@ -40,19 +31,18 @@ class SACAgent():
                  buffer_size=50000,
                  batch_size=64,
                  gradient_steps=1,
-                 env_func=None,
-                 num_envs=None,
+                 env=None,
                  actor_fc=None,
                  critic_fc=None,
                  conv_size=None,
                  logging_period=25,
                  checkpoint_period=50,
                  output_dir="/tmp/sac",
-                 restore_dir=None):
+                 restore_dir=None,
+                 wandb=None):
 
         # Build environment
-        env_func_list = [env_func for _ in range(num_envs)]
-        self.env = ParallelEnv(env_func_list)
+        self.env = env
         self.obs, self.infos = self.env.reset()
 
         # Build models
@@ -110,6 +100,7 @@ class SACAgent():
         self.logging_period = logging_period
         self.checkpoint_period = checkpoint_period
         self.episodes = 0
+        self.wandb = wandb
 
         # Build logging directories
         self.log_dir = os.path.join(output_dir, "logs/")
@@ -228,6 +219,7 @@ class SACAgent():
         print(f"| Policy Loss: {policy_loss} | Entropy Loss: {entropy_loss} |")
         print(f"| Q1 Loss: {q1_loss} | Q2 Loss: {q2_loss} |")
         print(f"| Alpha: {self.alpha} |")
+        print()
 
         # Periodically log
         if i % self.logging_period == 0:
@@ -238,6 +230,15 @@ class SACAgent():
                 tf.summary.scalar("Q1 Loss", q1_loss, i)
                 tf.summary.scalar("Q2 Loss", q2_loss, i)
                 tf.summary.scalar("Alpha", self.alpha, i)
+            if self.wandb != None:
+                self.wandb.log({"Step": i,
+                                "Average Reward": avg_reward,
+                                "Policy Loss": policy_loss,
+                                "Entropy Loss": entropy_loss,
+                                "Q1 Loss": q1_loss,
+                                "Q2 Loss": q2_loss,
+                                "Alpha": self.alpha})
+
         # Periodically save checkoints
         if i % self.checkpoint_period == 0:
             model_save_path = os.path.join(self.checkpoint_dir,
