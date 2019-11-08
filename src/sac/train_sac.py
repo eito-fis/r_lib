@@ -53,7 +53,7 @@ def main(args,
                              "conv_size": None})
     else: wandb = None
 
-    env = GymEnv("LunarLander-v2")
+    env = GymEnv("LunarLanderContinuous-v2")
     if args.render:
         env.render()
 
