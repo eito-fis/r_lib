@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-from src.general.policies import Policy
+from src.general.policies.policy import Policy
 
 # GLOBAL
 # Prevent division by zero
