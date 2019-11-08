@@ -5,7 +5,6 @@ from collections import deque
 import numpy as np
 import tensorflow as tf
 
-from src.general.envs.parallel_env import ParallelEnv
 from src.sac.sac_model import SACQnet, SACActor
 from src.sac.sac_policy import SACPolicy
 from src.general.policies import RandomPolicy
@@ -24,8 +23,7 @@ class SACAgent():
                  q_lr=0.0042,
                  entropy_lr=0.0042,
                  gamma=0.99,
-                 alpha=None,
-                 target_entropy=None,
+                 alpha=1,
                  tau=0.05,
                  buffer_size=50000,
                  batch_size=64,
@@ -44,27 +42,39 @@ class SACAgent():
         self.env = env
         self.obs, self.infos = self.env.reset()
 
-        # Build models
+        # Build networks
         self.actor = SACActor(num_actions=num_actions,
-                              state_size=self.env.state_size,
+                              state_size=self.env.obs_space,
                               stack_size=self.env.stack_size,
                               action_space=self.env.action_space,
                               fc=actor_fc,
                               conv_size=conv_size)
         self.q1 = SACQnet(num_actions=num_actions,
-                          state_size=self.env.state_size,
+                          state_size=self.env.obs_space,
                           stack_size=self.env.stack_size,
                           action_space=self.env.action_space,
                           fc=critic_fc,
                           conv_size=conv_size)
         self.q2 = SACQnet(num_actions=num_actions,
-                          state_size=self.env.state_size,
+                          state_size=self.env.obs_space,
                           stack_size=self.env.stack_size,
                           action_space=self.env.action_space,
                           fc=critic_fc,
                           conv_size=conv_size)
-        self.q1_t = tf.keras.models.clone_model(self.q1)
-        self.q2_t = tf.keras.models.clone_model(self.q2)
+        self.q1_t = SACQnet(num_actions=num_actions,
+                          state_size=self.env.obs_space,
+                          stack_size=self.env.stack_size,
+                          action_space=self.env.action_space,
+                          fc=critic_fc,
+                          conv_size=conv_size)
+        self.q2_t = SACQnet(num_actions=num_actions,
+                          state_size=self.env.obs_space,
+                          stack_size=self.env.stack_size,
+                          action_space=self.env.action_space,
+                          fc=critic_fc,
+                          conv_size=conv_size)
+        self.hard_update(self.q1_t, self.q1)
+        self.hard_update(self.q2_t, self.q2)
         if restore_dir:
             models = (self.actor, self.q1, self.q2, self.q1_t, self.q2_t)
             for model, restore_file in zip(models, restore_dir):
@@ -216,6 +226,14 @@ class SACAgent():
                                        q.trainable_weights):
             updated_param = (1 - self.tau) * target_param + self.tau * param
             tf.assign(target_param, updated_param)
+
+    def hard_update(self, q_t, q):
+        """
+        Hard update from q to target_q network
+        """
+        for target_param, param in zip(q_t.trainable_weights,
+                                       q.trainable_weights):
+            tf.assign(target_param, param)
 
     def log(self, policy_loss, q1_loss, q2_loss, entropy_loss, i, g):
         if len(self.reward_queue) == 0:
