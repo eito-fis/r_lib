@@ -54,9 +54,6 @@ class RandomPolicy(Policy):
         elif action_space_type=="Continuous":
             assert isinstance(action_space, list)
             self.sample_func = self.sample_continuous
-            self.num_actions = len(action_space)
-            self.ranges = [y - x for x,y in action_space]
-            self.mins = [x for x,y in action_space]
 
 
     def sample_discrete(self):
@@ -80,10 +77,11 @@ class RandomPolicy(Policy):
             actions: List of length batch_size, where each element is a list
             that holds the selected value for each dimension.
         """
-        # Generate random values between 0 and 1
-        actions = tf.random.uniform([self.batch_size, self.num_actions])
-        # Convert random actions to appropriate ranges
-        actions = actions * self.ranges + self.mins
+        # # Generate random values between 0 and 1
+        # actions = tf.random.uniform([self.batch_size, self.num_actions])
+        # # Convert random actions to appropriate ranges
+        # actions = actions * self.ranges + self.mins
+        actions = self.action_space.sample()
         return actions
 
     def call(self):
