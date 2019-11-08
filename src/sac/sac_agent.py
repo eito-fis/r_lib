@@ -49,22 +49,22 @@ class SACAgent():
                               action_space=self.env.action_space,
                               fc=actor_fc,
                               conv_size=conv_size)
-        self.q1 = SACQnet(state_size=self.env.obs_space,
+        self.q1 = SACQNet(state_size=self.env.obs_space,
                           stack_size=self.env.stack_size,
                           action_space=self.env.action_space,
                           fc=critic_fc,
                           conv_size=conv_size)
-        self.q2 = SACQnet(state_size=self.env.obs_space,
+        self.q2 = SACQNet(state_size=self.env.obs_space,
                           stack_size=self.env.stack_size,
                           action_space=self.env.action_space,
                           fc=critic_fc,
                           conv_size=conv_size)
-        self.q1_t = SACQnet(state_size=self.env.obs_space,
+        self.q1_t = SACQNet(state_size=self.env.obs_space,
                             stack_size=self.env.stack_size,
                             action_space=self.env.action_space,
                             fc=critic_fc,
                             conv_size=conv_size)
-        self.q2_t = SACQnet(state_size=self.env.obs_space,
+        self.q2_t = SACQNet(state_size=self.env.obs_space,
                             stack_size=self.env.stack_size,
                             action_space=self.env.action_space,
                             fc=critic_fc,
