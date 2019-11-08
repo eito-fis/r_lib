@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
-class Model(tf.keras.model.Model):
+class Model(tf.keras.models.Model):
     """
     Base Custom Model Class
     """
