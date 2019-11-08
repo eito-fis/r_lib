@@ -67,7 +67,6 @@ class SACPolicy(Policy):
         log_prob = self.gaussian_prob(mean, log_std, action)
         scaled_action, scaled_log_prob = self.squish(mean, action, log_prob)
 
-        scaled_action = scaled_action * np.abs(self.action_space.low)
         return scaled_action, scaled_log_prob
 
     def gaussian_prob(self, mean, log_std, action):

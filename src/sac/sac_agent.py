@@ -41,6 +41,7 @@ class SACAgent():
         # Build environment
         self.env = env
         self.obs, self.infos = self.env.reset()
+        self.action_space = self.env.action_space
 
         # Build networks
         self.actor = SACActor(num_actions=num_actions,
@@ -133,6 +134,8 @@ class SACAgent():
                 actions = self.random_policy()
             else:
                 actions, _ = self.policy(self.obs)
+                actions = actions * np.abs(self.action_space.low)
+            assert actions.shape == self.action_space.shape
 
             # Take step on env with action
             new_obs, rewards, self.dones, self.infos = self.env.step(actions)
