@@ -44,36 +44,31 @@ class SACAgent():
         self.action_space = self.env.action_space
 
         # Build networks
-        self.actor = SACActor(num_actions=num_actions,
-                              state_size=self.env.obs_space,
+        self.actor = SACActor(state_size=self.env.obs_space,
                               stack_size=self.env.stack_size,
                               action_space=self.env.action_space,
                               fc=actor_fc,
                               conv_size=conv_size)
-        self.q1 = SACQnet(num_actions=num_actions,
-                          state_size=self.env.obs_space,
+        self.q1 = SACQnet(state_size=self.env.obs_space,
                           stack_size=self.env.stack_size,
                           action_space=self.env.action_space,
                           fc=critic_fc,
                           conv_size=conv_size)
-        self.q2 = SACQnet(num_actions=num_actions,
-                          state_size=self.env.obs_space,
+        self.q2 = SACQnet(state_size=self.env.obs_space,
                           stack_size=self.env.stack_size,
                           action_space=self.env.action_space,
                           fc=critic_fc,
                           conv_size=conv_size)
-        self.q1_t = SACQnet(num_actions=num_actions,
-                          state_size=self.env.obs_space,
-                          stack_size=self.env.stack_size,
-                          action_space=self.env.action_space,
-                          fc=critic_fc,
-                          conv_size=conv_size)
-        self.q2_t = SACQnet(num_actions=num_actions,
-                          state_size=self.env.obs_space,
-                          stack_size=self.env.stack_size,
-                          action_space=self.env.action_space,
-                          fc=critic_fc,
-                          conv_size=conv_size)
+        self.q1_t = SACQnet(state_size=self.env.obs_space,
+                            stack_size=self.env.stack_size,
+                            action_space=self.env.action_space,
+                            fc=critic_fc,
+                            conv_size=conv_size)
+        self.q2_t = SACQnet(state_size=self.env.obs_space,
+                            stack_size=self.env.stack_size,
+                            action_space=self.env.action_space,
+                            fc=critic_fc,
+                            conv_size=conv_size)
         self.hard_update(self.q1_t, self.q1)
         self.hard_update(self.q2_t, self.q2)
         if restore_dir:
