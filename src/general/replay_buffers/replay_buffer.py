@@ -1,3 +1,5 @@
+import numpy as np
+
 class ReplayBuffer(object):
     """"
     StableBaselines ReplayBuffer object.
