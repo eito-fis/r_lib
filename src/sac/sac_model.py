@@ -114,6 +114,7 @@ class SACActor(Model):
 
         # Get true input_size
         # self.state_size = state_size[:-1] + [state_size[-1] * stack_size]
+        self.num_actions = action_space.shape[0]
 
         # Build convolutional layers
         self.convs = make_convs(conv_size)
@@ -123,8 +124,8 @@ class SACActor(Model):
         self.fc = [layers.Dense(neurons, activation="relu",
                                       name=f"{name}_dense_{i}")
                          for i,(neurons) in enumerate(fc)]
-        self.mean = layers.Dense(len(action_space), name=f'{name}_mean')
-        self.std = layers.Dense(len(action_space), name=f'{name}_std')
+        self.mean = layers.Dense(self.num_actions, name=f'{name}_mean')
+        self.std = layers.Dense(self.num_actions, name=f'{name}_std')
 
     def step(self, obs):
         # Run convs on input
