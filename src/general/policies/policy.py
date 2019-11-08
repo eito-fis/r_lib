@@ -47,12 +47,10 @@ class RandomPolicy(Policy):
                        action_space_type=action_space_type,
                        batch_size=batch_size)
         if action_space_type == "Discrete":
-            assert isinstance(action_space, int)
             self.sample_func = self.sample_discrete
             self.dist = [[1 / action_space for _ in action_space]
-                         for _ in batch_size]
+                         for _ in range(batch_size)]
         elif action_space_type=="Continuous":
-            assert isinstance(action_space, list)
             self.sample_func = self.sample_continuous
 
 

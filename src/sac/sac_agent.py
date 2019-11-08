@@ -82,6 +82,7 @@ class SACAgent():
                                 batch_size=1,
                                 model=self.actor)
         self.random_policy = RandomPolicy(action_space=self.env.action_space,
+                                          action_space_type="Continuous",
                                           batch_size=1)
         self.replay_buffer = ReplayBuffer(buffer_size)
         self.actor_opt = tf.keras.optimizers.Adam(actor_lr)
