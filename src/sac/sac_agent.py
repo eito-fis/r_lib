@@ -83,10 +83,10 @@ class SACAgent():
 
         # Build policy, replay buffer and optimizers
         self.policy = SACPolicy(action_space=self.env.action_space,
-                                batch_size=self.num_env,
+                                batch_size=1,
                                 model=self.actor)
         self.random_policy = RandomPolicy(action_space=self.env.action_space,
-                                          batch_size=self.num_env)
+                                          batch_size=1)
         self.replay_buffer = ReplayBuffer(buffer_size)
         self.actor_opt = tf.keras.optimizers.Adam(actor_lr)
         self.q1_opt = tf.keras.optimizers.Adam(q_lr)
@@ -104,8 +104,8 @@ class SACAgent():
         self.gradient_steps = gradient_steps
 
         # Setup entropy parameters
-        self.alpha = alpha
-        self.log_alpha = tf.log(alpha)
+        self.log_alpha = tf.Variable(tf.log(alpha), dtype=tf.float32)
+        self.alpha = tf.exp(self.log_alpha)
         self.target_entropy = -np.prod(self.env.action_space.shape)
 
         # Setup logging parameters
@@ -139,6 +139,7 @@ class SACAgent():
             # Store SARS(D) in replay buffer
             self.replay_buffer.add(self.obs, action, rewards, new_obs,
                                    float(self.done))
+            self.obs = new_obs
 
             if done:
                 self.reward_queue.extend([self.env.ep_reward])
@@ -169,7 +170,7 @@ class SACAgent():
         q1_ts = self.q1_t(b_n_obs, b_n_actions)
         q2_ts = self.q2_t(b_n_obs, b_n_actions)
         
-        # TODO Make sure you don"t need to stop gradient here
+        # TODO Make sure you don't need to stop gradient here
         min_q_ts = tf.minimum(q1_ts, q2_ts) - self.alpha * n_log_probs
         target_q = b_rewards + (1 - b_dones) * self.gamma * min_q_ts
         with tf.GradientTape(persistent=True) as tape:
@@ -202,7 +203,7 @@ class SACAgent():
         self.actor_opt.apply_gradients(zip(actor_grad,
                                            self.actor.trainable_weights))
         entropy_grad = tape.gradient(entropy_loss, self.log_alpha)
-        self.entropy_opt.apply_gradients(entropy_grad, self.log_alpha)
+        self.entropy_opt.apply_gradients(zip(entropy_grad, self.log_alpha))
         
         # Update the entropy constant
         self.alpha = tf.exp(tf.log_alpha)
