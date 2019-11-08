@@ -3,8 +3,9 @@ import gym
 class GymEnv():
     def __init__(self, gym_env):
         self.env = gym.make(gym_env)
-        self.obs_spacae = self.env.observation_space
+        self.obs_space = self.env.observation_space
         self.action_space = self.env.action_space
+        self.stack_size = 0
         self.ep_reward = 0
         self.reward = 0
 
