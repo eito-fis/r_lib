@@ -83,8 +83,15 @@ def main(args,
     print("Agent built!")
 
     print("Strating train...")
-    agent.train()
+    try:
+        agent.train()
+    finally:
+        # Make sure out environment is closed
+        # PLEASE DONT HIT CTRL C TWICE
+        env.close()
     print("Train done!")
+
+    env.close()
 
 
 if __name__ == '__main__':
