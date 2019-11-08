@@ -43,7 +43,7 @@ class RandomPolicy(Policy):
                  action_space=None,
                  action_space_type="Discrete",
                  batch_size=1):
-        super.__init__(action_space=action_space,
+        super().__init__(action_space=action_space,
                        action_space_type=action_space_type,
                        batch_size=batch_size)
         if action_space_type == "Discrete":
