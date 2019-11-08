@@ -54,7 +54,7 @@ def main(args,
     else: wandb = None
 
     env = GymEnv("LunarLander-v2")
-    if render:
+    if args.render:
         env.render()
 
     print("Building agent...")
@@ -77,8 +77,8 @@ def main(args,
                      conv_size=conv_size,
                      logging_period=logging_period,
                      checkpoint_period=checkpoint_period,
-                     output_dir=output_dir,
-                     restore_dir=restore,
+                     output_dir=args.output_dir,
+                     restore_dir=args.restore,
                      wandb=wandb)
     print("Agent built!")
 
