@@ -101,7 +101,7 @@ class SACAgent():
         self.gradient_steps = gradient_steps
 
         # Setup entropy parameters
-        self.log_alpha = tf.Variable(tf.log(alpha), dtype=tf.float32)
+        self.log_alpha = tf.Variable(tf.math.log(alpha), dtype=tf.float32)
         self.alpha = tf.exp(self.log_alpha)
         self.target_entropy = -np.prod(self.env.action_space.shape)
 
