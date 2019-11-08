@@ -32,15 +32,13 @@ class SACPolicy(Policy):
                  action_space_type="Continuous",
                  batch_size=1,
                  model=None):
-        super.__init__(action_space=action_space,
-                       action_space_type=action_space_type,
-                       batch_size=batch_size)
+        super().__init__(action_space=action_space,
+                         action_space_type=action_space_type,
+                         batch_size=batch_size)
         self.model = model
         if action_space_type == "Discrete":
-            assert isinstance(action_space, int)
             self.sample_func = self.sample_discrete
         elif action_space_type=="Continuous":
-            assert isinstance(action_space, list)
             self.sample_func = self.sample_continuous
 
 
