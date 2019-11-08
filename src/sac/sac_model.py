@@ -17,15 +17,18 @@ class SACQNet(Model):
         out: Output layer of the actor
     """
     def __init__(self,
+                 name="q",
                  state_size=None,
                  stack_size=None,
                  action_space=None,
                  fc=None,
-                 conv_size=None):
+                 conv_size=None,
+                 activation="relu"):
         """
         Constructor.
 
         Parameters:
+            name: Name of the network
             state_size: List containing the expected size of the state
             stack_size: Numer of states we can expect in our stack
             action_space: Box action space the actor will work in
@@ -38,26 +41,21 @@ class SACQNet(Model):
                        convolutional layer.
                 ex: ((8, 4, 16)) would make 1 convolution layer with an 8x8
                 kernel,(4, 4) stride and 16 filters
+            activation: Activaton function to use
         """
         super().__init__()
 
         # Get true input_size
-        self.state_size = state_size[:-1] + [state_size[-1] * stack_size]
+        # self.state_size = state_size[:-1] + [state_size[-1] * stack_size]
 
         # Build convolutional layers
-        if conv_size is not None:
-            if isinstance(conv_size, tuple):
-                self.convs = Custom_Convs(conv_size)
-            elif conv_size == "quake":
-                self.convs = Quake_Block()
-            else: raise ValueError("Invalid CNN Topology")
-            self.flatten = layers.Flatten()
-        else: self.convs = None
+        self.convs = make_convs(conv_size)
+        self.flatten = layers.Flatten()
 
-        self.fc = [layers.Dense(neurons, activation="activation",
-                                   name=f"q_dense_{i}") for i,(neurons)
-                      in enumerate(fc)]
-        self.out = layers.Dense(1, name=f"q_out")
+        self.fc = [layers.Dense(neurons, activation=activation,
+                                name=f"{name}_dense_{i}") for i,(neurons) in
+                   enumerate(fc)]
+        self.out = layers.Dense(1, name=f"{name}_out")
 
     def call(self, obs, actions):
         # Run convs on input
@@ -86,15 +84,18 @@ class SACActor(Model):
         out: Output layer of the actor
     """
     def __init__(self,
+                 name="actor",
                  state_size=None,
                  stack_size=None,
                  action_space=None,
                  fc=None,
-                 conv_size=None):
+                 conv_size=None,
+                 activation="relu"):
         """
         Constructor.
 
         Parameters:
+            name: Name of the model
             state_size: List containing the expected size of the state
             stack_size: Numer of states we can expect in our stack
             action_space: Box action space the actor will work in
@@ -107,28 +108,23 @@ class SACActor(Model):
                        convolutional layer.
                 ex: ((8, 4, 16)) would make 1 convolution layer with an 8x8
                 kernel,(4, 4) stride and 16 filters
+            activation: Activaton function to use
         """
         super().__init__()
 
         # Get true input_size
-        self.state_size = state_size[:-1] + [state_size[-1] * stack_size]
+        # self.state_size = state_size[:-1] + [state_size[-1] * stack_size]
 
         # Build convolutional layers
-        if conv_size is not None:
-            if isinstance(conv_size, tuple):
-                self.convs = Custom_Convs(conv_size)
-            elif conv_size == "quake":
-                self.convs = Quake_Block()
-            else: raise ValueError("Invalid CNN Topology")
-            self.flatten = layers.Flatten()
-        else: self.convs = None
+        self.convs = make_convs(conv_size)
+        self.flatten = layers.Flatten()
 
         # Build the layers for the actor and critic models
         self.fc = [layers.Dense(neurons, activation="relu",
-                                      name=f"actor_dense_{i}")
+                                      name=f"{name}_dense_{i}")
                          for i,(neurons) in enumerate(fc)]
-        self.mean = layers.Dense(len(action_space), name='actor_mean')
-        self.std = layers.Dense(len(action_space), name='actor_std')
+        self.mean = layers.Dense(len(action_space), name=f'{name}_mean')
+        self.std = layers.Dense(len(action_space), name=f'{name}_std')
 
     def step(self, obs):
         # Run convs on input
@@ -146,6 +142,20 @@ class SACActor(Model):
         std = self.std(dense)
 
         return mean, std
+
+def make_convs(conv_size):
+    """
+    Build convolutions based on passed parameter
+    """
+    if conv_size is not None:
+        if isinstance(conv_size, tuple):
+            return Custom_Convs(conv_size)
+        elif conv_size == "quake":
+            return Quake_Block()
+        else:
+            raise ValueError("Invalid CNN Topology")
+    else:
+        return None
 
 class Custom_Convs(tf.keras.Model):
     """
