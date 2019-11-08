@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 
 from src.general.envs.gym_env import GymEnv
-from src.sac.sac_agent import SacAgent
+from src.sac.sac_agent import SACAgent
 
 def main(args,
          train_steps=100000,
