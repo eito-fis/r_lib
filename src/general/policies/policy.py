@@ -21,7 +21,7 @@ class Policy():
         self.action_space_type = action_space_type
         self.batch_size = batch_size
     
-    def call(self):
+    def __call__(self):
         return NotImplementedError
 
 class RandomPolicy(Policy):
@@ -82,5 +82,5 @@ class RandomPolicy(Policy):
         actions = self.action_space.sample()
         return actions
 
-    def call(self):
+    def __call__(self):
         return self.sample_func()
