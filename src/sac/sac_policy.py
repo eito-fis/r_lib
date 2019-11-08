@@ -3,6 +3,7 @@ import tensorflow as tf
 
 from src.general.policies import Policy
 
+# GLOBAL
 # Prevent division by zero
 EPS = 1e-6
 # CAP the standard deviation of the actor
@@ -41,12 +42,12 @@ class SACPolicy(Policy):
         elif action_space_type=="Continuous":
             assert isinstance(action_space, list)
             self.sample_func = self.sample_continuous
-            self.num_actions = len(action_space)
-            self.ranges = [y - x for x,y in action_space]
-            self.mins = [x for x,y in action_space]
 
 
     def sample_discrete(self):
+        """
+        SAC Discrete coming soon near you...
+        """
         raise NotImplementedError
 
     def sample_continuous(self, obs):
@@ -66,7 +67,7 @@ class SACPolicy(Policy):
         log_prob = self.gaussian_prob(mean, log_std, action)
         scaled_action, scaled_log_prob = self.squish(mean, action, log_prob)
 
-        scaled_action = scaled_action * self.ranges + self.mins
+        scaled_action = scaled_action * np.abs(self.action_space.low)
         return scaled_action, scaled_log_prob
 
     def gaussian_prob(self, mean, log_std, action):
