@@ -76,8 +76,7 @@ class SACAgent():
                           conv_size=conv_size)
         self.q1_t = tf.keras.models.clone_model(self.q1)
         self.q2_t = tf.keras.models.clone_model(self.q2)
-        if restore_dir != None:
-            self.model.load_weights(restore_dir)
+        self.models = (self.actor, self.q1, self.q2, self.q1_t, self.q2_t)
 
         # Build policy, replay buffer and optimizers
         self.policy = SACPolicy(action_space=self.env.action_space,
@@ -107,7 +106,6 @@ class SACAgent():
         self.target_entropy = -np.prod(self.env.action_space.shape)
 
         # Setup logging parameters
-        self.floor_queue = deque(maxlen=100)
         self.reward_queue = deque(maxlen=100)
         self.logging_period = logging_period
         self.checkpoint_period = checkpoint_period
@@ -135,6 +133,10 @@ class SACAgent():
             self.replay_buffer.add(self.obs, action, rewards, new_obs,
                                    float(self.done))
 
+            if done:
+                self.reward_queue.extend([self.env.ep_reward])
+                self.episodes += 1
+
             # Periodically learn
             if i % self.train_freq == 0:
                 for g in self.gradient_steps:
@@ -143,40 +145,9 @@ class SACAgent():
                     if not self.replay_buffer.can_sample(self.batch_size) or \
                        i < self.random_steps:
                         break
+                    self.update(i, g)
 
-                    # Calculate loss values
-                    q1_loss, q2_loss, policy_loss, entropy_loss, tape = self.loss()
-
-                    # Calculate and apply gradients
-                    q1_grad = tape.gradient(q1_loss, self.q1.trainable_weights)
-                    self.q1_opt.apply_gradients(zip(q1_grad,
-                                                    self.q1.trianable_weights))
-                    q2_grad = tape.gradient(q2_loss, self.q2.trainable_weights)
-                    self.q2_opt.apply_gradients(zip(q2_grad,
-                                                    self.q2.trianable_weights))
-                    actor_grad = tape.gradient(policy_loss,
-                                               self.actor.trainable_weights)
-                    self.actor_opt.apply_gradients(zip(actor_grad,
-                                                       self.actor.trainable_weights))
-                    entropy_grad = tape.gradient(entropy_loss, self.log_alpha)
-                    self.entropy_opt.apply_gradients(entropy_grad, self.log_alpha)
-                    
-                    # Update the entropy constant
-                    self.alpha = tf.exp(tf.log_alpha)
-
-                    # Garbage collect the GradientTape
-                    del tape
-
-                    # Soft updates for the target network
-                    # TODO: Test this
-                    if (i +  g) % self.target_update_freq == 0:
-                        self.soft_update(self.q1_t, self.q1)
-                        self.soft_update(self.q2_t, self.q2)
-
-                    #self.log(rewards, values, ep_infos, policy_loss, q1_loss,
-                    #         q2_loss, i, g)
-
-    def loss(self):
+    def update(self, i, g, ep_infos):
         # Sample and unpack batch
         batch = self.replay_buffer.sample(self.batch_size)
         b_obs, b_actions, b_rewards, b_n_obs, b_dones = batch
@@ -209,8 +180,33 @@ class SACAgent():
             entropy_loss = -tf.reduce_mean(self.log_alpha *
                                            tf.stop_gradient(log_probs +
                                                             self.target_entropy))
+        # Calculate and apply gradients
+        q1_grad = tape.gradient(q1_loss, self.q1.trainable_weights)
+        self.q1_opt.apply_gradients(zip(q1_grad,
+                                        self.q1.trianable_weights))
+        q2_grad = tape.gradient(q2_loss, self.q2.trainable_weights)
+        self.q2_opt.apply_gradients(zip(q2_grad,
+                                        self.q2.trianable_weights))
+        actor_grad = tape.gradient(policy_loss,
+                                   self.actor.trainable_weights)
+        self.actor_opt.apply_gradients(zip(actor_grad,
+                                           self.actor.trainable_weights))
+        entropy_grad = tape.gradient(entropy_loss, self.log_alpha)
+        self.entropy_opt.apply_gradients(entropy_grad, self.log_alpha)
+        
+        # Update the entropy constant
+        self.alpha = tf.exp(tf.log_alpha)
 
-        return q1_loss, q2_loss, policy_loss, entropy_loss, tape
+        # Garbage collect the GradientTape
+        del tape
+
+        # Soft updates for the target network
+        # TODO: Test this
+        if (i + g) % self.target_update_freq == 0:
+            self.soft_update(self.q1_t, self.q1)
+            self.soft_update(self.q2_t, self.q2)
+
+        self.log(policy_loss, q1_loss, q2_loss, entropy_loss, i, g)
 
     def soft_update(self, q_t, q):
         """
@@ -221,58 +217,33 @@ class SACAgent():
             updated_param = (1 - self.tau) * target_param + self.tau * param
             tf.assign(target_param, updated_param)
 
-    def log(self, rewards, values, ep_infos, policy_loss, q1_loss, q2_loss,
-                i, g):
-        # Pull specific info from info array and store in queue
-        for info in ep_infos:
-            self.floor_queue.append(info["floor"])
-            self.reward_queue.append(info["total_reward"])
-            self.episodes += 1
+    def log(self, policy_loss, q1_loss, q2_loss, entropy_loss, i, g):
+        if len(self.reward_queue) == 0:
+            avg_reward = 0
+        else:
+            avg_reward = sum(self.reward_queue) / len(self.reward_queue)
 
-        avg_floor = 0 if len(self.floor_queue) == 0 else sum(self.floor_queue)/\
-        len(self.floor_queue)
-        avg_reward = 0 if len(self.reward_queue) == 0 else\
-        sum(self.reward_queue) / len(self.reward_queue)
-        explained_variance = self.explained_variance(values, rewards)
-
-        print("| Iteration: {} |".format(i))
-        print("| Episodes: {} | Average Floor: {} | Average Reward: {}\
-              |".format(self.episodes, avg_floor, avg_reward))
-        print("| Entropy Loss: {} | Policy Loss: {} | Value Loss: {}\
-              |".format(entropy_loss, policy_loss, value_loss))
-        print("| Explained Variance: {} | Environment Variance: {}\
-              |".format(explained_variance, np.var(rewards)))
+        print(f"Step {i} - Gradient Step {g}")
+        print(f"| Episodes: {self.episodes} | Average Reward{avg_reward} |")
+        print(f"| Policy Loss: {policy_loss} | Entropy Loss: {entropy_loss} |")
+        print(f"| Q1 Loss: {q1_loss} | Q2 Loss: {q2_loss} |")
+        print(f"| Alpha: {self.alpha} |")
 
         # Periodically log
         if i % self.logging_period == 0:
             with self.summary_writer.as_default():
-                tf.summary.scalar("Average Floor", avg_floor, i)
                 tf.summary.scalar("Average Reward", avg_reward, i)
-                tf.summary.scalar("Entropy Loss", entropy_loss, i)
                 tf.summary.scalar("Policy Loss", policy_loss, i)
-                tf.summary.scalar("Value Loss", value_loss, i)
-                tf.summary.scalar("Explained Variance", explained_variance, i)
+                tf.summary.scalar("Entropy Loss", entropy_loss, i)
+                tf.summary.scalar("Q1 Loss", q1_loss, i)
+                tf.summary.scalar("Q2 Loss", q2_loss, i)
+                tf.summary.scalar("Alpha", self.alpha, i)
         # Periodically save checkoints
         if i % self.checkpoint_period == 0:
             model_save_path = os.path.join(self.checkpoint_dir,
                                            "model_{}.h5".format(i))
             self.model.save_weights(model_save_path)
             print("Model saved to {}".format(model_save_path))
-
-    def explained_variance(self, y_pred, y_true):
-        """
-        Computes fraction of variance that ypred explains about y.
-        Returns 1 - Var[y-ypred] / Var[y]
-        interpretation:
-            ev=0  =>  might as well have predicted zero
-            ev=1  =>  perfect prediction
-            ev<0  =>  worse than just predicting zero
-        """
-        assert y_true.ndim == 1 and y_pred.ndim == 1
-        var_y = np.var(y_true)
-        return np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
-
-
 
 
 
