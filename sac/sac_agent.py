@@ -35,6 +35,7 @@ class SACAgent():
                  entropy_lr=0.0042,
                  gamma=0.99,
                  alpha=None,
+                 target_entropy=None,
                  tau=0.05,
                  buffer_size=50000,
                  batch_size=64,
@@ -92,7 +93,6 @@ class SACAgent():
 
         # Setup training parameters
         self.gamma = gamma
-        self.alpha = alpha
         self.tau = tau
         self.train_steps = train_steps
         self.random_steps = random_steps
@@ -100,6 +100,11 @@ class SACAgent():
         self.target_update_feq = target_update_freq
         self.batch_size = batch_size
         self.gradient_steps = gradient_steps
+
+        # Setup entropy parameters
+        self.alpha = alpha
+        self.log_alpha = tf.log(alpha)
+        self.target_entropy = -np.prod(self.env.action_space.shape)
 
         # Setup logging parameters
         self.floor_queue = deque(maxlen=100)
@@ -139,7 +144,8 @@ class SACAgent():
                        i < self.random_steps:
                         break
 
-                    q1_loss, q2_loss, policy_loss, tape = self.loss()
+                    # Calculate loss values
+                    q1_loss, q2_loss, policy_loss, entropy_loss, tape = self.loss()
 
                     # Calculate and apply gradients
                     q1_grad = tape.gradient(q1_loss, self.q1.trainable_weights)
@@ -152,7 +158,13 @@ class SACAgent():
                                                self.actor.trainable_weights)
                     self.actor_opt.apply_gradients(zip(actor_grad,
                                                        self.actor.trainable_weights))
-                    # Delete the GradientTape
+                    entropy_grad = tape.gradient(entropy_loss, self.log_alpha)
+                    self.entropy_opt.apply_gradients(entropy_grad, self.log_alpha)
+                    
+                    # Update the entropy constant
+                    self.alpha = tf.exp(tf.log_alpha)
+
+                    # Garbage collect the GradientTape
                     del tape
 
                     # Soft updates for the target network
@@ -161,11 +173,15 @@ class SACAgent():
                         self.soft_update(self.q1_t, self.q1)
                         self.soft_update(self.q2_t, self.q2)
 
+                    #self.log(rewards, values, ep_infos, policy_loss, q1_loss,
+                    #         q2_loss, i, g)
+
     def loss(self):
         # Sample and unpack batch
         batch = self.replay_buffer.sample(self.batch_size)
         b_obs, b_actions, b_rewards, b_n_obs, b_dones = batch
-        b_obs = process_inputs(b_obs)
+        # Probably don't need to preprocess if not doing parallel actors
+        #b_obs = process_inputs(b_obs)
 
         # Calculate loss
         b_n_actions, n_log_probs = self.policy(b_n_obs)
@@ -187,9 +203,14 @@ class SACAgent():
             n_q1s = self.q1(b_obs, new_actions)
             n_q2s = self.q2(b_obs, new_actions)
             min_n_qs = tf.min(q1s, q2s)
-
             policy_loss = tf.reduce_mean(self.alpha * log_probs - min_n_qs)
-        return q1_loss, q2_loss, policy_loss, tape
+
+            # Entropy loss
+            entropy_loss = -tf.reduce_mean(self.log_alpha *
+                                           tf.stop_gradient(log_probs +
+                                                            self.target_entropy))
+
+        return q1_loss, q2_loss, policy_loss, entropy_loss, tape
 
     def soft_update(self, q_t, q):
         """
@@ -200,8 +221,8 @@ class SACAgent():
             updated_param = (1 - self.tau) * target_param + self.tau * param
             tf.assign(target_param, updated_param)
 
-    def logging(self, rewards, values, ep_infos, entropy_loss, policy_loss,
-                value_loss, i):
+    def log(self, rewards, values, ep_infos, policy_loss, q1_loss, q2_loss,
+                i, g):
         # Pull specific info from info array and store in queue
         for info in ep_infos:
             self.floor_queue.append(info["floor"])
