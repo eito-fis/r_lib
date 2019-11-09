@@ -74,7 +74,7 @@ class SACPolicy(Policy):
         """
         pre_sum = -0.5 * (((action - mean) / (tf.exp(log_std) + EPS)) ** 2 +
                           2 * log_std + np.log(2 * np.pi))
-        log_prob = tf.reduce_sum(pre_sim, axis=1)
+        log_prob = tf.reduce_sum(pre_sum, axis=1)
         return log_prob
 
     def squish(self, mean, action, log_prob):
@@ -82,7 +82,7 @@ class SACPolicy(Policy):
         Squish the action and scale the log probability accordingly
         """
         scaled_action = tf.tanh(action)
-        log_prob -= tf.reduce_sum(tf.log(1 - scaled_action ** 2 + EPS), axis=1)
+        log_prob -= tf.reduce_sum(tf.math.log(1 - scaled_action ** 2 + EPS), axis=1)
         return scaled_action, log_prob
 
     def __call__(self, obs):
