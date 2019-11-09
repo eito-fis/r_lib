@@ -25,3 +25,4 @@ class GymEnv():
 
     def reset(self):
         obs = self.env.reset()
+        return obs
