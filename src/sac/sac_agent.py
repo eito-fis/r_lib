@@ -131,6 +131,7 @@ class SACAgent():
                 action = self.random_policy()
             else:
                 action, _ = self.policy(np.expand_dims(self.obs, 0))
+                action = tf.squeeze(action)
                 action = action * np.abs(self.action_space.low)
             assert action.shape == self.action_space.shape
 
@@ -155,7 +156,7 @@ class SACAgent():
                         break
                     self.update(i, g)
 
-    def update(self, i, g, ep_infos):
+    def update(self, i, g):
         """
         Samples from the replay buffer and updates the model
         """
