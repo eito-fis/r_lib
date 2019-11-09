@@ -130,7 +130,7 @@ class SACAgent():
             if i < self.random_steps:
                 action = self.random_policy()
             else:
-                action, _ = self.policy(self.obs)
+                action, _ = self.policy(np.expand_dims(self.obs, 0))
                 action = action * np.abs(self.action_space.low)
             assert action.shape == self.action_space.shape
 
