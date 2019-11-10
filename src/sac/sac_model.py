@@ -56,7 +56,8 @@ class SACQNet(Model):
                                 name=f"{name}_dense_{i}") for i,(neurons) in
                    enumerate(fc)]
         self.out = layers.Dense(1, name=f"{name}_out")
-        self.call(action_space.sample())
+        self.call(np.ones(state_size.shape, dtype=np.float32)[None, :],
+                  action_space.sample()[None, :])
 
     def call(self, obs, actions):
         # Run convs on input
@@ -127,7 +128,7 @@ class SACActor(Model):
                          for i,(neurons) in enumerate(fc)]
         self.mean = layers.Dense(self.num_actions, name=f'{name}_mean')
         self.std = layers.Dense(self.num_actions, name=f'{name}_std')
-        self.call(action_space.sample())
+        self.call(np.ones(state_size.shape, dtype=np.float32)[None, :])
 
     def call(self, obs):
         # Run convs on input
