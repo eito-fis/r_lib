@@ -69,8 +69,8 @@ class SACAgent():
                             action_space=self.env.action_space,
                             fc=critic_fc,
                             conv_size=conv_size)
-        self.hard_update(self.q1_t, self.q1)
-        self.hard_update(self.q2_t, self.q2)
+        self.q1_t.set_weights(self.q1.get_weights())
+        self.q2_t.set_weights(self.q2.get_weights())
         if restore_dir:
             models = (self.actor, self.q1, self.q2, self.q1_t, self.q2_t)
             for model, restore_file in zip(models, restore_dir):
@@ -96,7 +96,7 @@ class SACAgent():
         self.train_steps = train_steps
         self.random_steps = random_steps
         self.train_freq = train_freq
-        self.target_update_feq = target_update_freq
+        self.target_update_freq = target_update_freq
         self.batch_size = batch_size
         self.gradient_steps = gradient_steps
 
@@ -137,6 +137,7 @@ class SACAgent():
 
             # Take step on env with action
             new_obs, rewards, done, self.infos = self.env.step(action)
+            self.env.render()
             # Store SARS(D) in replay buffer
             self.replay_buffer.add(self.obs, action, rewards, new_obs,
                                    float(done))
@@ -145,6 +146,7 @@ class SACAgent():
             if done:
                 self.reward_queue.extend([self.env.ep_reward])
                 self.episodes += 1
+                self.obs = self.env.reset()
 
             # Periodically learn
             if i % self.train_freq == 0:
@@ -185,7 +187,7 @@ class SACAgent():
             new_actions, log_probs = self.policy(b_obs)
             n_q1s = self.q1(b_obs, new_actions)
             n_q2s = self.q2(b_obs, new_actions)
-            min_n_qs = tf.min(q1s, q2s)
+            min_n_qs = tf.minimum(q1s, q2s)
             policy_loss = tf.reduce_mean(self.alpha * log_probs - min_n_qs)
 
             # Entropy loss
@@ -195,19 +197,19 @@ class SACAgent():
         # Calculate and apply gradients
         q1_grad = tape.gradient(q1_loss, self.q1.trainable_weights)
         self.q1_opt.apply_gradients(zip(q1_grad,
-                                        self.q1.trianable_weights))
+                                        self.q1.trainable_weights))
         q2_grad = tape.gradient(q2_loss, self.q2.trainable_weights)
         self.q2_opt.apply_gradients(zip(q2_grad,
-                                        self.q2.trianable_weights))
+                                        self.q2.trainable_weights))
         actor_grad = tape.gradient(policy_loss,
                                    self.actor.trainable_weights)
         self.actor_opt.apply_gradients(zip(actor_grad,
                                            self.actor.trainable_weights))
         entropy_grad = tape.gradient(entropy_loss, self.log_alpha)
-        self.entropy_opt.apply_gradients(zip(entropy_grad, self.log_alpha))
+        self.entropy_opt.apply_gradients(zip([entropy_grad], [self.log_alpha]))
         
         # Update the entropy constant
-        self.alpha = tf.exp(tf.log_alpha)
+        self.alpha = tf.exp(self.log_alpha)
 
         # Garbage collect the GradientTape
         del tape
@@ -235,7 +237,7 @@ class SACAgent():
         """
         for target_param, param in zip(q_t.trainable_weights,
                                        q.trainable_weights):
-            tf.assign(target_param, param)
+            target_param = param
 
     def log(self, policy_loss, q1_loss, q2_loss, entropy_loss, i, g):
         if len(self.reward_queue) == 0:
