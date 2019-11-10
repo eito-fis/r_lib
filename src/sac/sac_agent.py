@@ -1,4 +1,3 @@
-
 import os
 from collections import deque
 
@@ -226,18 +225,10 @@ class SACAgent():
         """
         Soft update from q to target_q network based on self.tau
         """
-        for target_param, param in zip(q_t.trainable_weights,
-                                       q.trainable_weights):
-            updated_param = (1 - self.tau) * target_param + self.tau * param
-            tf.assign(target_param, updated_param)
-
-    def hard_update(self, q_t, q):
-        """
-        Hard update from q to target_q network
-        """
-        for target_param, param in zip(q_t.trainable_weights,
-                                       q.trainable_weights):
-            target_param = param
+        for target_weights, weights in zip(q_t.weights,
+                                       q.weights):
+            updated_weights = (1 - self.tau) * target_weights + self.tau * weights
+            target_weights.assign(updated_weights)
 
     def log(self, policy_loss, q1_loss, q2_loss, entropy_loss, i, g):
         if len(self.reward_queue) == 0:
@@ -246,7 +237,7 @@ class SACAgent():
             avg_reward = sum(self.reward_queue) / len(self.reward_queue)
 
         print(f"Step {i} - Gradient Step {g}")
-        print(f"| Episodes: {self.episodes} | Average Reward{avg_reward} |")
+        print(f"| Episodes: {self.episodes} | Average Reward: {avg_reward} |")
         print(f"| Policy Loss: {policy_loss} | Entropy Loss: {entropy_loss} |")
         print(f"| Q1 Loss: {q1_loss} | Q2 Loss: {q2_loss} |")
         print(f"| Alpha: {self.alpha} |")
@@ -271,12 +262,12 @@ class SACAgent():
                                 "Alpha": self.alpha})
 
         # Periodically save all models
-        if i % self.checkpoint_period == 0:
-            self.actor_model.save(f"actor_model_{i}", self.checkpoint_dir)
-            self.q1_model.save(f"q1_model_{i}", self.checkpoint_dir)
-            self.q2_model.save(f"q2_model_{i}", self.checkpoint_dir)
-            self.q1_t_model.save(f"q1_t_model_{i}", self.checkpoint_dir)
-            self.q2_t_model.save(f"q2_t_model_{i}", self.checkpoint_dir)
+        if i % self.checkpoint_period == 0 and i != 0:
+            self.actor.save(f"actor_model_{i}", self.checkpoint_dir)
+            self.q1.save(f"q1_model_{i}", self.checkpoint_dir)
+            self.q2.save(f"q2_model_{i}", self.checkpoint_dir)
+            self.q1_t.save(f"q1_t_model_{i}", self.checkpoint_dir)
+            self.q2_t.save(f"q2_t_model_{i}", self.checkpoint_dir)
 
 
 
