@@ -25,7 +25,7 @@ class SACAgent():
                  alpha=1,
                  tau=0.05,
                  buffer_size=50000,
-                 batch_size=64,
+                 batch_size=256,
                  gradient_steps=1,
                  env=None,
                  actor_fc=None,
@@ -136,7 +136,7 @@ class SACAgent():
 
             # Take step on env with action
             new_obs, rewards, done, self.infos = self.env.step(action)
-            self.env.render()
+            # self.env.render()
             # Store SARS(D) in replay buffer
             self.replay_buffer.add(self.obs, action, rewards, new_obs,
                                    float(done))
@@ -174,7 +174,8 @@ class SACAgent():
         
         # TODO Make sure you don't need to stop gradient here
         min_q_ts = tf.minimum(q1_ts, q2_ts) - self.alpha * n_log_probs
-        target_q = b_rewards + (1 - b_dones) * self.gamma * min_q_ts
+        target_q = tf.stop_gradient(b_rewards + (1 - b_dones) * self.gamma *
+                                    min_q_ts)
         with tf.GradientTape(persistent=True) as tape:
             # Q loss
             q1s = self.q1(b_obs, b_actions)
@@ -231,20 +232,20 @@ class SACAgent():
             target_weights.assign(updated_weights)
 
     def log(self, policy_loss, q1_loss, q2_loss, entropy_loss, i, g):
-        if len(self.reward_queue) == 0:
-            avg_reward = 0
-        else:
-            avg_reward = sum(self.reward_queue) / len(self.reward_queue)
-
-        print(f"Step {i} - Gradient Step {g}")
-        print(f"| Episodes: {self.episodes} | Average Reward: {avg_reward} |")
-        print(f"| Policy Loss: {policy_loss} | Entropy Loss: {entropy_loss} |")
-        print(f"| Q1 Loss: {q1_loss} | Q2 Loss: {q2_loss} |")
-        print(f"| Alpha: {self.alpha} |")
-        print()
-
         # Periodically log
         if i % self.logging_period == 0:
+            if len(self.reward_queue) == 0:
+                avg_reward = 0
+            else:
+                avg_reward = sum(self.reward_queue) / len(self.reward_queue)
+
+            print(f"Step {i} - Gradient Step {g}")
+            print(f"| Episodes: {self.episodes} | Average Reward: {avg_reward} |")
+            print(f"| Policy Loss: {policy_loss} | Entropy Loss: {entropy_loss} |")
+            print(f"| Q1 Loss: {q1_loss} | Q2 Loss: {q2_loss} |")
+            print(f"| Alpha: {self.alpha} |")
+            print()
+
             with self.summary_writer.as_default():
                 tf.summary.scalar("Average Reward", avg_reward, i)
                 tf.summary.scalar("Policy Loss", policy_loss, i)
@@ -255,11 +256,11 @@ class SACAgent():
             if self.wandb != None:
                 self.wandb.log({"Step": i,
                                 "Average Reward": avg_reward,
-                                "Policy Loss": policy_loss,
-                                "Entropy Loss": entropy_loss,
-                                "Q1 Loss": q1_loss,
-                                "Q2 Loss": q2_loss,
-                                "Alpha": self.alpha})
+                                "Policy Loss": policy_loss.numpy(),
+                                "Entropy Loss": entropy_loss.numpy(),
+                                "Q1 Loss": q1_loss.numpy(),
+                                "Q2 Loss": q2_loss.numpy(),
+                                "Alpha": self.alpha.numpy()})
 
         # Periodically save all models
         if i % self.checkpoint_period == 0 and i != 0:

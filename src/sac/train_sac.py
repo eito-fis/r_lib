@@ -11,20 +11,20 @@ def main(args,
          random_steps=1000,
          train_freq=1,
          target_update_freq=1,
-         actor_lr=0.000042,
-         q_lr=0.000042,
-         entropy_lr=0.000042,
+         actor_lr=0.00042,
+         q_lr=0.00042,
+         entropy_lr=0.00042,
          gamma=0.99,
          alpha=1,
          tau=0.005,
-         buffer_size=50000,
-         batch_size=512,
+         buffer_size=500000,
+         batch_size=2024,
          gradient_steps=1,
          actor_fc=(128, 128),
          critic_fc=(128, 128),
          conv_size=None,
-         logging_period=10,
-         checkpoint_period=100):
+         logging_period=25,
+         checkpoint_period=5000):
 
     if args.wandb:
         import wandb
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--output-dir',
         type=str,
-        default='/tmp/ppo')
+        default='/tmp/sac')
 
     # File path arguments
     parser.add_argument(
