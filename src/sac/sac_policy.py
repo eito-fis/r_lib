@@ -62,18 +62,18 @@ class SACPolicy(Policy):
 
         action = mean + tf.random.normal(tf.shape(mean)) * std
 
-        log_prob = self.gaussian_prob(mean, log_std, action)
+        log_prob = self.gaussian_prob(action, mean, log_std)
         scaled_action, scaled_log_prob = self.squish(mean, action, log_prob)
 
         return scaled_action, scaled_log_prob
 
-    def gaussian_prob(self, mean, log_std, action):
+    def gaussian_prob(self, action, mean, log_std):
         """
         Get log probability of a value given a mean and log standard deviation
         fo a gaussian distribution
         """
-        pre_sum = -0.5 * (((action - mean) / (tf.exp(log_std) + EPS)) ** 2 +
-                          2 * log_std + np.log(2 * np.pi))
+        pre_sum = -0.5 * (((action - mean) / (tf.exp(log_std) + EPS)) ** 2 + 2 *
+                          log_std + np.log(2 * np.pi))
         log_prob = tf.reduce_sum(pre_sum, axis=1)
         return log_prob
 
