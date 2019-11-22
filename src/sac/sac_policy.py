@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability.distributions as Normal
 
 from src.general.policies.policy import Policy
 
@@ -37,18 +38,26 @@ class SACPolicy(Policy):
                          batch_size=batch_size)
         self.model = model
         if action_space_type == "Discrete":
-            self.sample_func = self.sample_discrete
+            self.eval_func = self.eval_disc
+            self.step_func = self.step_disc
         elif action_space_type=="Continuous":
-            self.sample_func = self.sample_continuous
+            self.eval_func = self.eval_cont
+            self.step_func = self.step_cont
 
 
-    def sample_discrete(self):
+    def eval_disc(self):
         """
-        SAC Discrete coming soon near you...
+        SAC Discrete coming to cloud engines near you...
         """
         raise NotImplementedError
 
-    def sample_continuous(self, obs):
+    def step_disc(self):
+        """
+        SAC Discrete coming to cloud engines near you...
+        """
+        raise NotImplementedError
+
+    def eval_cont(self, obs, flag):
         """
         Samples actions using the actor network
 
@@ -57,15 +66,44 @@ class SACPolicy(Policy):
             containing actions for all dimensions
         """
         mean, log_std = self.model(obs)
-        log_std = tf.clip_by_value(log_std, LOG_STD_MIN, LOG_STD_MAX)
+        #log_std = tf.clip_by_value(log_std, LOG_STD_MIN, LOG_STD_MAX)
         std = tf.exp(log_std)
 
-        action = mean + tf.random.normal(tf.shape(mean)) * std
+        pre_squish_action = mean + std * Normal(0, 1).sample()
+        squish_action = tf.math.tanh(pre_squish_action)
+        action = squish_action * self.action_range
 
-        log_prob = self.gaussian_prob(action, mean, log_std)
-        scaled_action, scaled_log_prob = self.squish(mean, action, log_prob)
+        log_prob = Normal(mean, std).log_prob(pre_squish_action) - \
+                    tf.math.log(1. - squish_action**2 + EPS) - \
+                    np.log(self.action_range)
+        log_prob = tf.reduce_sum(log_prob, axis=1)[:, None]
 
-        return scaled_action, scaled_log_prob
+        # # log_prob = self.gaussian_prob(action, mean, log_std)
+        # log_prob_ns = self.gaussian_prob(action, mean, log_std)
+        # log_prob = tf.reduce_sum(log_prob_ns, axis=1)
+        # # scaled_action, scaled_log_prob = self.squish(mean, action, log_prob)
+        # scaled_action, scaled_log_prob, scaled_log_prob_ns = self.squish(mean, action, log_prob)
+        if flag:
+            print(f"Mean: {mean}")
+            print(f"Std Dev: {std}")
+            print(f"Action: {action}")
+            print(f"Probs: {tf.exp(log_prob_ns)}")
+            print(f"Scaled Action: {scaled_action}")
+            print(f"Scaled Probs: {tf.exp(scaled_log_prob_ns)}")
+            print(f"Scaled Sum Probs: {tf.exp(scaled_log_prob)}")
+
+        return action, log_prob
+
+    def step_cont(self, obs, deterministic=False):
+        mean, log_std = self.model(obs)
+        std = tf.exp(log_std)
+
+        pre_squish_action = mean + std * Normal(0, 1).sample()
+        pre_squish_action = mean if deterministic else pre_squish_action
+        squish_action = tf.math.tanh(pre_squish_action)
+        action = squish_action * self.action_range
+
+        return action.numpy()[0]
 
     def gaussian_prob(self, action, mean, log_std):
         """
@@ -73,17 +111,24 @@ class SACPolicy(Policy):
         fo a gaussian distribution
         """
         pre_sum = -0.5 * (((action - mean) / (tf.exp(log_std) + EPS)) ** 2 + 2 *
-                          log_std + np.log(2 * np.pi))
-        log_prob = tf.reduce_sum(pre_sum, axis=1)
-        return log_prob
+                          log_std + np.log(2 * np.pi)) 
+        # log_prob = tf.reduce_sum(pre_sum, axis=1)
+        # return log_prob
+        return pre_sum
 
     def squish(self, mean, action, log_prob):
         """
         Squish the action and scale the log probability accordingly
         """
         scaled_action = tf.tanh(action)
-        log_prob -= tf.reduce_sum(tf.math.log(1 - scaled_action ** 2 + EPS), axis=1)
-        return scaled_action, log_prob
+        # log_prob -= tf.reduce_sum(tf.math.log(1 - scaled_action ** 2 + EPS),
+        #                           axis=1)
+        tmp = tf.math.log(1 - scaled_action ** 2 + EPS)
+        log_prob -= tf.reduce_sum(tmp, axis=1)
+        return scaled_action, log_prob, tmp
 
-    def __call__(self, obs):
-        return self.sample_func(obs)
+    def eval(self, obs, flag=False):
+        return self.eval_func(obs, flag)
+
+    def step(self, obs, flag=False):
+        return self.step_func(obs, flag)
