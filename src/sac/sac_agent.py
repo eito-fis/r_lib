@@ -39,7 +39,6 @@ class SACAgent():
 
         # Build environment
         self.env = env
-        self.obs = self.env.reset()
         self.action_space = self.env.action_space
 
         # Build networks
@@ -78,7 +77,6 @@ class SACAgent():
 
         # Build policy, replay buffer and optimizers
         self.policy = SACPolicy(action_space=self.env.action_space,
-                                batch_size=1,
                                 model=self.actor)
         self.random_policy = RandomPolicy(action_space=self.env.action_space,
                                           action_space_type="Continuous",
@@ -125,11 +123,14 @@ class SACAgent():
         """
         Trains the model
         """
+        obs = self.env.reset()
+        avg_prob = 0
         for i in range(self.train_steps):
             if i < self.random_steps:
                 action = self.random_policy()
             else:
-                action, _ = self.policy(self.obs[None, :])
+                # action, _ = self.policy(obs[None, :], (avg_prob > 8))
+                action, _ = self.policy(obs[None, :])
                 action = tf.squeeze(action)
                 action = action * np.abs(self.action_space.low)
             assert action.shape == self.action_space.shape
@@ -138,14 +139,14 @@ class SACAgent():
             new_obs, rewards, done, self.infos = self.env.step(action)
             # self.env.render()
             # Store SARS(D) in replay buffer
-            self.replay_buffer.add(self.obs, action, rewards, new_obs,
+            self.replay_buffer.add(obs, action, rewards, new_obs,
                                    float(done))
-            self.obs = new_obs
+            obs = new_obs
 
             if done:
                 self.reward_queue.extend([self.env.ep_reward])
                 self.episodes += 1
-                self.obs = self.env.reset()
+                obs = self.env.reset()
 
             # Periodically learn
             if i % self.train_freq == 0:
@@ -155,7 +156,7 @@ class SACAgent():
                     if not self.replay_buffer.can_sample(self.batch_size) or \
                        i < self.random_steps:
                         break
-                    self.update(i, g, done)
+                    avg_prob = self.update(i, g, done)
 
     def update(self, i, g, done):
         """
@@ -171,56 +172,58 @@ class SACAgent():
         q2_ts = self.q2_t(b_n_obs, b_n_actions)
         
         min_q_ts = tf.minimum(q1_ts, q2_ts) - self.alpha * n_log_probs
-        target_q = tf.stop_gradient(b_rewards + (1 - b_dones) * self.gamma *
-                                    min_q_ts)
-        with tf.GradientTape(persistent=True) as tape:
-            # Q loss
-            q1s = self.q1(b_obs, b_actions)
-            q2s = self.q2(b_obs, b_actions)
-            q1_loss = 0.5 * tf.reduce_mean((q1s - target_q) ** 2)
-            q2_loss = 0.5 * tf.reduce_mean((q2s - target_q) ** 2)
+        target_q = b_rewards + (1 - b_dones) * self.gamma * min_q_ts
 
-            # Policy loss
+        with tf.GradientTape() as q1_tape:
+            q1s = self.q1(b_obs, b_actions)
+            q1_loss = 0.5 * tf.reduce_mean((q1s - target_q) ** 2)
+        q1_grad = tape.gradient(q1_loss, self.q1.trainable_weights)
+        self.q1_opt.apply_gradients(zip(q1_grad,
+                                        self.q1.trainable_weights))
+
+        with tf.GradientTape() as q2_tape:
+            q2s = self.q2(b_obs, b_actions)
+            q2_loss = 0.5 * tf.reduce_mean((q2s - target_q) ** 2)
+        q2_grad = tape.gradient(q2_loss, self.q2.trainable_weights)
+        self.q2_opt.apply_gradients(zip(q2_grad,
+                                        self.q2.trainable_weights))
+
+        with tf.GradientTape() as actor_tape:
             new_actions, log_probs = self.policy(b_obs)
+            # if tf.reduce_mean(tf.exp(log_probs)) > 3:
+            #     print(tf.exp(log_probs))
+            #     input()
+            #     new_actions, log_probs = self.policy(b_obs, True)
             n_q1s = self.q1(b_obs, new_actions)
             n_q2s = self.q2(b_obs, new_actions)
             min_n_qs = tf.minimum(n_q1s, n_q2s)
             actor_loss = tf.reduce_mean(self.alpha * log_probs - min_n_qs)
+        actor_grad = tape.gradient(actor_loss,
+                                   self.actor.trainable_weights)
+        self.actor_opt.apply_gradients(zip(actor_grad,
+                                           self.actor.trainable_weights))
 
-            # Entropy loss
+        with tf.GradientTape() as alpha_tape:
             entropy_loss = -tf.reduce_mean(self.log_alpha *
                                            tf.stop_gradient(log_probs +
                                                             self.target_entropy))
-        # Calculate and apply gradients
-        actor_grad = tape.gradient(actor_loss,
-                                   self.actor.trainable_weights)
-        q1_grad = tape.gradient(q1_loss, self.q1.trainable_weights)
-        q2_grad = tape.gradient(q2_loss, self.q2.trainable_weights)
         entropy_grad = tape.gradient(entropy_loss, self.log_alpha)
-
-        self.entropy_opt.apply_gradients(zip([entropy_grad], [self.log_alpha]))
-        self.actor_opt.apply_gradients(zip(actor_grad,
-                                           self.actor.trainable_weights))
-        self.q1_opt.apply_gradients(zip(q1_grad,
-                                        self.q1.trainable_weights))
-        self.q2_opt.apply_gradients(zip(q2_grad,
-                                        self.q2.trainable_weights))
-        
+        self.entropy_opt.apply_gradients(zip([entropy_grad],
+                                             [self.log_alpha]))
         # Update the entropy constant
         self.alpha = tf.exp(self.log_alpha)
-
-        # Garbage collect the GradientTape
-        del tape
 
         # Soft updates for the target network
         if (i + g) % self.target_update_freq == 0:
             self.soft_update(self.q1_t, self.q1)
             self.soft_update(self.q2_t, self.q2)
 
+        avg_prob = 0
         if done:
-            logprob = tf.reduce_mean(log_probs)
-            self.log(actor_loss, logprob, q1_loss, q2_loss, entropy_loss,
+            avg_prob = tf.reduce_mean(tf.exp(log_probs))
+            self.log(actor_loss, avg_prob, q1_loss, q2_loss, entropy_loss,
                      i, g)
+        return avg_prob
 
     def soft_update(self, q_t, q):
         """
@@ -239,8 +242,7 @@ class SACAgent():
                                        q.weights):
             target_weights.assign(weights)
 
-    def log(self, actor_loss, logprob, q1_loss, q2_loss, entropy_loss, i,
-            g):
+    def log(self, actor_loss, avg_prob, q1_loss, q2_loss, entropy_loss, i, g):
         # Periodically log
         if len(self.reward_queue) == 0:
             avg_reward = 0
@@ -251,7 +253,7 @@ class SACAgent():
         print(f"Step {i} - Gradient Step {g}")
         print(f"| Episodes: {self.episodes} |")
         print(f"| Average Reward: {avg_reward} | Ep Reward: {ep_reward} |")
-        print(f"| Actor Loss: {actor_loss} | Average Log Probs: {logprob} |")
+        print(f"| Actor Loss: {actor_loss} | Avg Probs: {avg_prob} |")
         print(f"| Q1 Loss: {q1_loss} | Q2 Loss: {q2_loss} |")
         print(f"| Entropy Loss: {entropy_loss} |")
         print(f"| Alpha: {self.alpha} |")
@@ -261,7 +263,7 @@ class SACAgent():
             tf.summary.scalar("Average Reward", avg_reward, i)
             tf.summary.scalar("Episode Reward", ep_reward, i)
             tf.summary.scalar("Actor Loss", actor_loss, i)
-            tf.summary.scalar("Average Log Prob", logprob, i)
+            tf.summary.scalar("Average Prob", avg_prob, i)
             tf.summary.scalar("Entropy Loss", entropy_loss, i)
             tf.summary.scalar("Q1 Loss", q1_loss, i)
             tf.summary.scalar("Q2 Loss", q2_loss, i)
@@ -271,7 +273,7 @@ class SACAgent():
                             "Average Reward": avg_reward,
                             "Episode Reward": ep_reward,
                             "Actor Loss": actor_loss.numpy(),
-                            "Average Log Prob": logprob.numpy(),
+                            "Average Prob": avg_prob.numpy(),
                             "Entropy Loss": entropy_loss.numpy(),
                             "Q1 Loss": q1_loss.numpy(),
                             "Q2 Loss": q2_loss.numpy(),
