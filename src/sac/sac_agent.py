@@ -216,30 +216,6 @@ class SACAgent():
             self.soft_update(self.q1_t, self.q1)
             self.soft_update(self.q2_t, self.q2)
 
-        # Garbage collect the GradientTape
-        del tape
-
-        # Garbage collect the GradientTape
-        del tape
-
-        # Garbage collect the GradientTape
-        del tape
-
-        # Garbage collect the GradientTape
-        del tape
-
-        # Garbage collect the GradientTape
-        del tape
-
-        # Garbage collect the GradientTape
-        del tape
-
-        # Garbage collect the GradientTape
-        del tape
-
-        # Garbage collect the GradientTape
-        del tape
-
         avg_prob = 0
         if done:
             avg_prob = tf.reduce_mean(tf.exp(log_probs))
