@@ -130,9 +130,7 @@ class SACAgent():
                 action = self.random_policy()
             else:
                 # action, _ = self.policy(obs[None, :], (avg_prob > 8))
-                action, _ = self.policy(obs[None, :])
-                action = tf.squeeze(action)
-                action = action * np.abs(self.action_space.low)
+                action, _ = self.policy.step(obs[None, :])
             assert action.shape == self.action_space.shape
 
             # Take step on env with action
@@ -167,7 +165,7 @@ class SACAgent():
         b_obs, b_actions, b_rewards, b_n_obs, b_dones = batch
 
         # Calculate loss
-        b_n_actions, n_log_probs = self.policy(b_n_obs)
+        b_n_actions, n_log_probs = self.policy.evaluate(b_n_obs)
         q1_ts = self.q1_t(b_n_obs, b_n_actions)
         q2_ts = self.q2_t(b_n_obs, b_n_actions)
         
@@ -189,7 +187,7 @@ class SACAgent():
                                         self.q2.trainable_weights))
 
         with tf.GradientTape() as actor_tape:
-            new_actions, log_probs = self.policy(b_obs)
+            new_actions, log_probs = self.policy.evaluate(b_obs)
             # if tf.reduce_mean(tf.exp(log_probs)) > 3:
             #     print(tf.exp(log_probs))
             #     input()
@@ -208,7 +206,7 @@ class SACAgent():
                                            tf.stop_gradient(log_probs +
                                                             self.target_entropy))
         entropy_grad = tape.gradient(entropy_loss, self.log_alpha)
-        self.entropy_opt.apply_gradients(zip([entropy_grad],
+        self.entropy_opt.apply_gradients(zip(entropy_grad,
                                              [self.log_alpha]))
         # Update the entropy constant
         self.alpha = tf.exp(self.log_alpha)
@@ -217,6 +215,30 @@ class SACAgent():
         if (i + g) % self.target_update_freq == 0:
             self.soft_update(self.q1_t, self.q1)
             self.soft_update(self.q2_t, self.q2)
+
+        # Garbage collect the GradientTape
+        del tape
+
+        # Garbage collect the GradientTape
+        del tape
+
+        # Garbage collect the GradientTape
+        del tape
+
+        # Garbage collect the GradientTape
+        del tape
+
+        # Garbage collect the GradientTape
+        del tape
+
+        # Garbage collect the GradientTape
+        del tape
+
+        # Garbage collect the GradientTape
+        del tape
+
+        # Garbage collect the GradientTape
+        del tape
 
         avg_prob = 0
         if done:
