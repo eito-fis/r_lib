@@ -129,8 +129,7 @@ class SACAgent():
             if i < self.random_steps:
                 action = self.random_policy()
             else:
-                # action, _ = self.policy(obs[None, :], (avg_prob > 8))
-                action, _ = self.policy.step(obs[None, :])
+                action = self.policy.step(obs[None, :])
             assert action.shape == self.action_space.shape
 
             # Take step on env with action
@@ -163,9 +162,11 @@ class SACAgent():
         # Sample and unpack batch
         batch = self.replay_buffer.sample(self.batch_size)
         b_obs, b_actions, b_rewards, b_n_obs, b_dones = batch
+        b_rewards = b_rewards[:, None]
+        b_dones = b_dones[:, None]
 
         # Calculate loss
-        b_n_actions, n_log_probs = self.policy.evaluate(b_n_obs)
+        b_n_actions, n_log_probs = self.policy.eval(b_n_obs)
         q1_ts = self.q1_t(b_n_obs, b_n_actions)
         q2_ts = self.q2_t(b_n_obs, b_n_actions)
         
@@ -175,28 +176,24 @@ class SACAgent():
         with tf.GradientTape() as q1_tape:
             q1s = self.q1(b_obs, b_actions)
             q1_loss = 0.5 * tf.reduce_mean((q1s - target_q) ** 2)
-        q1_grad = tape.gradient(q1_loss, self.q1.trainable_weights)
+        q1_grad = q1_tape.gradient(q1_loss, self.q1.trainable_weights)
         self.q1_opt.apply_gradients(zip(q1_grad,
                                         self.q1.trainable_weights))
 
         with tf.GradientTape() as q2_tape:
             q2s = self.q2(b_obs, b_actions)
             q2_loss = 0.5 * tf.reduce_mean((q2s - target_q) ** 2)
-        q2_grad = tape.gradient(q2_loss, self.q2.trainable_weights)
+        q2_grad = q2_tape.gradient(q2_loss, self.q2.trainable_weights)
         self.q2_opt.apply_gradients(zip(q2_grad,
                                         self.q2.trainable_weights))
 
         with tf.GradientTape() as actor_tape:
-            new_actions, log_probs = self.policy.evaluate(b_obs)
-            # if tf.reduce_mean(tf.exp(log_probs)) > 3:
-            #     print(tf.exp(log_probs))
-            #     input()
-            #     new_actions, log_probs = self.policy(b_obs, True)
+            new_actions, log_probs = self.policy.eval(b_obs)
             n_q1s = self.q1(b_obs, new_actions)
             n_q2s = self.q2(b_obs, new_actions)
             min_n_qs = tf.minimum(n_q1s, n_q2s)
             actor_loss = tf.reduce_mean(self.alpha * log_probs - min_n_qs)
-        actor_grad = tape.gradient(actor_loss,
+        actor_grad = actor_tape.gradient(actor_loss,
                                    self.actor.trainable_weights)
         self.actor_opt.apply_gradients(zip(actor_grad,
                                            self.actor.trainable_weights))
@@ -205,8 +202,8 @@ class SACAgent():
             entropy_loss = -tf.reduce_mean(self.log_alpha *
                                            tf.stop_gradient(log_probs +
                                                             self.target_entropy))
-        entropy_grad = tape.gradient(entropy_loss, self.log_alpha)
-        self.entropy_opt.apply_gradients(zip(entropy_grad,
+        entropy_grad = alpha_tape.gradient(entropy_loss, self.log_alpha)
+        self.entropy_opt.apply_gradients(zip([entropy_grad],
                                              [self.log_alpha]))
         # Update the entropy constant
         self.alpha = tf.exp(self.log_alpha)

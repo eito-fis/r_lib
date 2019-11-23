@@ -7,7 +7,7 @@ from src.general.envs.gym_env import GymEnv
 from src.sac.sac_agent import SACAgent
 
 def main(args,
-         train_steps=300000,
+         train_steps=1000000,
          random_steps=1000,
          train_freq=1,
          target_update_freq=1,
@@ -20,8 +20,8 @@ def main(args,
          buffer_size=500000,
          batch_size=256,
          gradient_steps=1,
-         actor_fc=(256, 256),
-         critic_fc=(256, 256),
+         actor_fc=(512, 256),
+         critic_fc=(512, 256),
          conv_size=None,
          logging_period=25,
          checkpoint_period=5000):
@@ -35,22 +35,22 @@ def main(args,
         else:
             wandb.init(project="hexapod-sac",
                        entity="olin-robolab")
-        wandb.config.update({"train_steps": 100000,
-                             "random_steps": 1000,
-                             "train_freq": 1,
-                             "target_update_freq": 1,
-                             "actor_lr": 0.000042,
-                             "q_lr": 0.000042,
-                             "entropy_lr": 0.000042,
-                             "gamma": 0.99,
-                             "alpha": 1,
-                             "tau": 0.005,
-                             "buffer_size": 50000,
-                             "batch_size": 512,
-                             "gradient_steps": 1,
-                             "actor_fc": (128, 128),
-                             "critic_fc": (128, 128),
-                             "conv_size": None})
+        wandb.config.update({"train_steps": train_steps,
+                             "random_steps": random_steps,
+                             "train_freq": train_freq,
+                             "target_update_freq": target_update_freq,
+                             "actor_lr": actor_lr,
+                             "q_lr": q_lr,
+                             "entropy_lr": entropy_lr,
+                             "gamma": gamma,
+                             "alpha": alpha,
+                             "tau": tau,
+                             "buffer_size": buffer_size,
+                             "batch_size": batch_size,
+                             "gradient_steps": gradient_steps,
+                             "actor_fc": actor_fc,
+                             "critic_fc": critic_fc,
+                             "conv_size": conv_size})
     else: wandb = None
 
     env = GymEnv("LunarLanderContinuous-v2")
