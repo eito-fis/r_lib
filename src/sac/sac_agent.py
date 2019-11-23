@@ -31,6 +31,7 @@ class SACAgent():
                  actor_fc=None,
                  critic_fc=None,
                  conv_size=None,
+                 norm_reward=False,
                  logging_period=25,
                  checkpoint_period=50,
                  output_dir="/tmp/sac",
@@ -96,6 +97,7 @@ class SACAgent():
         self.target_update_freq = target_update_freq
         self.batch_size = batch_size
         self.gradient_steps = gradient_steps
+        self.norm_reward = norm_reward
 
         # Setup entropy parameters
         self.log_alpha = tf.Variable(tf.math.log(tf.cast(alpha, tf.float32)),
@@ -155,7 +157,7 @@ class SACAgent():
                         break
                     avg_prob = self.update(i, g, done)
 
-    def update(self, i, g, done):
+    def update(self, i, g, done, reward_scale=10):
         """
         Samples from the replay buffer and updates the model
         """
@@ -164,6 +166,10 @@ class SACAgent():
         b_obs, b_actions, b_rewards, b_n_obs, b_dones = batch
         b_rewards = b_rewards[:, None]
         b_dones = b_dones[:, None]
+
+        if self.norm_reward:
+            reward = reward_scale * (reward - np.mean(reward, axis=0)) / \
+                        (np.std(reward, axis=0) + 1e-6)
 
         # Calculate loss
         b_n_actions, n_log_probs = self.policy.eval(b_n_obs)
