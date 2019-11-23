@@ -18,6 +18,7 @@ class Policy():
                  action_space_type="Discrete",
                  batch_size=1):
         self.action_space = action_space
+        self.action_range = (action_space.high - action_space.low) / 2
         self.action_space_type = action_space_type
         self.batch_size = batch_size
     
