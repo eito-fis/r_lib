@@ -27,10 +27,13 @@ def worker(parent_remote, remote, env_fn_wrapper, idx):
             total_info = info.copy()
             remote.send((state, total_info))
         elif cmd == 'close':
+            env.close()
             remote.close()
             break
         elif cmd == 'get_size':
-            remote.send((env.state_size, env.stack_size))
+            remote.send((env.obs_space,
+                         env.action_space,
+                         env.stack_size))
         else:
             raise NotImplementedError
 
@@ -124,6 +127,18 @@ class ParallelEnv():
             remote.send(('close', None))
         for p in self.ps:
             p.join()
+
+    def get_size(self):
+        for remote in self.remotes:
+            remote.send(('get_size', None))
+
+        # ..then wait for the response from each one
+        results = [remote.recv() for remote in self.remotes]
+        
+        # Split responses up into individual lists
+        obs_spaces, action_spaces, stack_sizes = zip(*results)
+        return (obs_spaces, action_spaces, stack_sizes)
+
 
     @property
     def num_envs(self):
